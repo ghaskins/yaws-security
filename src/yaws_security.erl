@@ -1,7 +1,5 @@
--module(test_server).
+-module(yaws_security).
 -behaviour(gen_server).
-
--include_lib("yaws/include/yaws.hrl").
 
 -export([
     start_link/1, init/1,
@@ -12,22 +10,8 @@
 start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
-init([Port]) ->
-
-    yaws_security:init();
-
-    GC = yaws_config:make_default_gconf(false, "test-server"),
-    SC = #sconf{
-      port = Port,
-      servername = "localhost",
-      listen = {0, 0, 0, 0},
-      docroot = "/tmp",
-      appmods = [{"/", security_filter}]
-    },
-    case catch yaws_api:setconf(GC, [[SC]]) of
-        ok -> {ok, started};
-        Error -> {stop, Error}
-    end.
+init(_Args) ->
+    ok.
 
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
 

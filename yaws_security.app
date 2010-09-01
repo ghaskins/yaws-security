@@ -2,5 +2,5 @@
 {vsn, "0.1.0"},
 {modules, [__MODULES__]},
 {registered, []},
-{applications, [kernel, stdlib, yaws]}
- ]}.	       
+{applications, [kernel, stdlib, yaws]},
+{mod, {yaws_security_app, []}} ]}.	       
