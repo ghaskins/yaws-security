@@ -14,8 +14,6 @@ start_link(Args) ->
 
 init([Port]) ->
 
-    yaws_security:init();
-
     GC = yaws_config:make_default_gconf(false, "test-server"),
     SC = #sconf{
       port = Port,

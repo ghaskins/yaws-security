@@ -1,0 +1,9 @@
+{release,
+ {"yaws_security_test", "0.1.0"},
+ {erts, "5.7.5"},
+ [{kernel, "2.13.5"},
+  {stdlib, "1.16.5"},
+  {yaws, "1.88"},
+  {yaws_security, "0.1.0"},
+  {yaws_security_test, "0.1.0"}
+]}.
