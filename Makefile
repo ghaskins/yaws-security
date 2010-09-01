@@ -2,7 +2,7 @@ nullstring :=
 space := $(nullstring) # a space at the end
 commaspace := ,$(space)
 
-NAME=yaws-security
+NAME=yaws_security
 OBJDIR=./obj
 EBINDIR=$(OBJDIR)/$(NAME)/ebin
 SRCS += $(shell find src/*.erl)
