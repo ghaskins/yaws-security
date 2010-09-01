@@ -14,13 +14,16 @@ start_link(Args) ->
 
 init([Port]) ->
 
+    {ok, TestChain} = yaws_security:create_filterchain([test_filter]),
+    ok = yaws_security:create_realm("/", TestChain, test_handler),
+
     GC = yaws_config:make_default_gconf(false, "test-server"),
     SC = #sconf{
       port = Port,
       servername = "localhost",
       listen = {0, 0, 0, 0},
       docroot = "/tmp",
-      appmods = [{"/", security_filter}]
+      appmods = [{"/", yaws_security_filterchain}]
     },
     case catch yaws_api:setconf(GC, [[SC]]) of
         ok -> {ok, started};
