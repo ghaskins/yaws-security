@@ -1,0 +1,11 @@
+{release,
+ {"yawssecurity", "0.1.0"},
+ {erts, "5.7.5"},
+ [{kernel, "2.13.5"},
+  {stdlib, "1.16.5"},
+  {sasl, "2.1.9"},
+  {inets, "5.3"},
+  {ssl, "3.10.8"},
+  {yaws, "1.88"},
+  {yawssecurity, "0.1.0"}
+]}.
