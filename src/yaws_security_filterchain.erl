@@ -21,24 +21,34 @@ out(Arg) ->
     end.
 
 process(Arg, Chain, Handler) ->
-    [{status, 400}].
+    {ok, Pid} = yaws_security_context:start_link(),
+
+    Ctx = #context{pid = Pid, chain = Chain, handler = Handler},
+    next(Arg, Ctx).
+
+next(Arg, Ctx=#context{chain=[{function, FilterFun} | T]}) ->
+    FilterFun(Arg, Ctx#context{chain=T});
+next(Arg, Ctx=#context{chain=[], handler={function, HandlerFun}}) ->
+    HandlerFun(Arg, Ctx).
 
 %----------------------------------------------------------------------
 
-testfilter(Arg, Ctx) ->
-    %next(Arg, Ctx).
-    ok.
+testfilter(Arg, Ctx, State) ->
+    ?debugFmt("testfilter: Ctx: ~p State: ~p~n", [Ctx, State]),
+    next(Arg, Ctx).
 
 testhandler(Arg, Ctx) ->
-    ok.
+    ?debugFmt("testhandler: ~p~n", [Ctx]),
+    [{status, 200}].
 
 rest_test() ->
 
     Handler = fun(Arg, Ctx) -> testhandler(Arg, Ctx) end,
     
     {ok, Chain} = yaws_security:register_filterchain(
-			[{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx) end}],
-			[]),
+		    [{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end},
+		     {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, b) end}],
+		    []),
     ok = yaws_security:register_realm("/", Chain, {function, Handler}, []),
 
     application:start(yaws),
@@ -60,7 +70,7 @@ rest_test() ->
     
     application:start(inets),
     Url = "http://localhost:8000",
-    {ok, {Proto, Headers, Body}} =
+    {ok, {{HttpVer, 200, Msg}, Headers, Body}} =
 	http:request(get, {Url, []}, [], []),
     
     ok.
