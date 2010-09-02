@@ -24,7 +24,12 @@ process(Arg, Chain, Handler) ->
     {ok, Pid} = yaws_security_context:start_link(),
 
     Ctx = #context{pid = Pid, chain = Chain, handler = Handler},
-    next(Arg, Ctx).
+    
+    Ret = next(Arg, Ctx),
+    
+    yaws_security_context:stop(Pid),
+
+    Ret.
 
 next(Arg, Ctx=#context{chain=[{function, FilterFun} | T]}) ->
     FilterFun(Arg, Ctx#context{chain=T});

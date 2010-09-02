@@ -10,6 +10,8 @@
     terminate/2, code_change/3
 ]).
 
+-export([stop/1]).
+
 -record(state, {}).
 
 start_link() ->
@@ -18,6 +20,11 @@ start_link() ->
 init(_Args) ->
     {ok, #state{}}.
 
+stop(Pid) ->
+    gen_server:call(Pid, stop).
+
+handle_call(stop, _From, State) ->
+    {stop, normal, ok, State};
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
 
 handle_cast(_Message, State) -> {noreply, State}.
