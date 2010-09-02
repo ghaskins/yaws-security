@@ -114,23 +114,23 @@ eval_match(Path, Realm) ->
 %---------------------------------------------------------------------------
 % test-harness
 
-myfilter(Arg, Next) ->
-    yaws_security_filter:next(Next).
+myfilter(Arg, Ctx) ->
+    yaws_security_filterchain:next(Arg, Ctx).
 
-first_handler(Arg) ->
-    ok.
+first_handler(Arg, Ctx) ->
+    [{status, 200}].
 
-second_handler(Arg) ->
-    ok.
+second_handler(Arg, Ctx) ->
+    [{status, 404}].
 
 filter_test() ->
     start_link(0),
 
-    Handler1 = fun(Arg) -> first_handler(Arg) end,
-    Handler2 = fun(Arg) -> second_handler(Arg) end,
+    Handler1 = fun(Arg, Ctx) -> first_handler(Arg, Ctx) end,
+    Handler2 = fun(Arg, Ctx) -> second_handler(Arg, Ctx) end,
 
     {ok, TestChain} = yaws_security:register_filterchain(
-			[{function, fun(Arg, Next) -> myfilter(Arg, Next) end}], []),
+			[{function, fun(Arg, Ctx) -> myfilter(Arg, Ctx) end}], []),
     ok = yaws_security:register_realm("/good/path",
 				      TestChain,
 				      {function, Handler1},
