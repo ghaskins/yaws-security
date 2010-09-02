@@ -30,7 +30,7 @@ register_realm(Path, ChainId, Handler, Options) ->
     gen_server:call(?MODULE, {register_realm, Path, ChainId, Handler, Options}).
 
 resolve_handler(Path, Options) ->
-    gen_server:call(?MODULE, {resolve_handler, Path}).
+    gen_server:call(?MODULE, {resolve_handler, Path, Options}).
 
 handle_call({register_filterchain, ChainSpec, []}, _From, State) ->
 
@@ -63,7 +63,7 @@ handle_call({register_realm, Path, ChainId, {function, Handler}, []},
 handle_call({register_realm, Path, ChainId, Handler, []}, _From, State) ->
     {reply, {error, bad_handler}, State};
 
-handle_call({resolve_handler, Path}, _From, State) ->
+handle_call({resolve_handler, Path, []}, _From, State) ->
     RealmsList = dict:to_list(State#state.realms),
 
     EvaluatedRealms = [eval_match(Path, X) || {_, X} <- RealmsList],
