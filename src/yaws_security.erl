@@ -8,7 +8,7 @@
     terminate/2, code_change/3
 ]).
 
--export([create_filterchain/1, create_realm/3, find_chain/1]).
+-export([register_filterchain/2, register_realm/4, resolve_handler/2]).
 
 -record(state, {filterchains, nextid, realms}).
 -record(filterchain, {id, filters}).
@@ -23,16 +23,16 @@ start_link(Args) ->
 init(_Args) ->
     {ok, #state{filterchains = dict:new(), nextid = 0, realms = dict:new()}}.
 
-create_filterchain(ChainSpec) ->
-    gen_server:call(?MODULE, {create_filterchain, ChainSpec}).
+register_filterchain(ChainSpec, Options) ->
+    gen_server:call(?MODULE, {register_filterchain, ChainSpec, Options}).
 
-create_realm(Path, ChainId, Handler) ->
-    gen_server:call(?MODULE, {create_realm, Path, ChainId, Handler}).
+register_realm(Path, ChainId, Handler, Options) ->
+    gen_server:call(?MODULE, {register_realm, Path, ChainId, Handler, Options}).
 
-find_chain(Path) ->
-    gen_server:call(?MODULE, {find_chain, Path}).
+resolve_handler(Path, Options) ->
+    gen_server:call(?MODULE, {resolve_handler, Path}).
 
-handle_call({create_filterchain, ChainSpec}, _From, State) ->
+handle_call({register_filterchain, ChainSpec, []}, _From, State) ->
 
     ChainId = State#state.nextid,
     Filters = [#filter{type=function, object=#functionfilter{function=F}}
@@ -43,7 +43,8 @@ handle_call({create_filterchain, ChainSpec}, _From, State) ->
     NewState = State#state{filterchains = UpdateChain, nextid = ChainId+1},
     {reply, {ok, ChainId}, NewState};
 
-handle_call({create_realm, Path, ChainId, {function, Handler}}, _From, State) ->
+handle_call({register_realm, Path, ChainId, {function, Handler}, []},
+	    _From, State) ->
     case dict:find(Path, State#state.realms) of
 	{ok, _} ->
 	    {reply, {error, exists}, State};
@@ -59,10 +60,10 @@ handle_call({create_realm, Path, ChainId, {function, Handler}}, _From, State) ->
 	    end
     end;
 
-handle_call({create_realm, Path, ChainId, Handler}, _From, State) ->
+handle_call({register_realm, Path, ChainId, Handler, []}, _From, State) ->
     {reply, {error, bad_handler}, State};
 
-handle_call({find_chain, Path}, _From, State) ->
+handle_call({resolve_handler, Path}, _From, State) ->
     RealmsList = dict:to_list(State#state.realms),
 
     EvaluatedRealms = [eval_match(Path, X) || {_, X} <- RealmsList],
@@ -127,29 +128,33 @@ filter_test() ->
     Handler1 = fun(Arg) -> first_handler(Arg) end,
     Handler2 = fun(Arg) -> second_handler(Arg) end,
 
-    {ok, TestChain} = yaws_security:create_filterchain(
-			[{function, fun(Arg, Next) -> myfilter(Arg, Next) end}]),
-    ok = yaws_security:create_realm("/good/path",
-				    TestChain,
-				    {function, Handler1}
+    {ok, TestChain} = yaws_security:register_filterchain(
+			[{function, fun(Arg, Next) -> myfilter(Arg, Next) end}], []),
+    ok = yaws_security:register_realm("/good/path",
+				      TestChain,
+				      {function, Handler1},
+				      []
 				   ),
-    ok = yaws_security:create_realm("/good/path/even/better",
-				    TestChain,
-				    {function, Handler2}
-				   ),
+    ok = yaws_security:register_realm("/good/path/even/better",
+				      TestChain,
+				      {function, Handler2},
+				      []
+				     ),
 
-    {error, exists} = yaws_security:create_realm("/good/path",
-						 TestChain,
-						 {function, Handler2}
-						),
-    {error, bad_chain_id} = yaws_security:create_realm("/bogus",
-						       badid,
-						       {function, Handler1}
-						      ),
-    {error, bad_handler} = yaws_security:create_realm("/bogus",
-						       TestChain, bad_handler),
+    {error, exists} = yaws_security:register_realm("/good/path",
+						   TestChain,
+						   {function, Handler2},
+						   []
+						  ),
+    {error, bad_chain_id} = yaws_security:register_realm("/bogus",
+							 badid,
+							 {function, Handler1},
+							 []
+							),
+    {error, bad_handler} = yaws_security:register_realm("/bogus",
+						       TestChain, bad_handler, []),
 
-    {ok, Chain1, {function, Handler1}} = find_chain("/good/path/and/then/some"),
-    {ok, Chain2, {function, Handler2}} = find_chain("/good/path/even/better/foo"),
+    {ok, Chain1, {function, Handler1}} = resolve_handler("/good/path/and/then/some", []),
+    {ok, Chain2, {function, Handler2}} = resolve_handler("/good/path/even/better/foo", []),
     ?debugFmt("Chain1: ~p~n", [Chain1]),
-    {error, notfound} = find_chain("/bad/path").
+    {error, notfound} = resolve_handler("/bad/path", []).
