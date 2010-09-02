@@ -12,6 +12,8 @@ WSMODULES = $(patsubst src/%.erl,%, $(SRCS))
 MODULES = $(subst $(space),$(commaspace), $(WSMODULES))
 INCLUDES += -I/usr/lib
 INCLUDES += -I./include
+PKGS += -pa /usr/lib/yaws/ebin
+PKGS += -pa $(EBINDIR)
 
 all: application release
 
@@ -34,17 +36,18 @@ $(EBINDIR)/%.beam: src/%.erl Makefile
 $(OBJDIR)/$(NAME).boot: $(NAME).rel application
 	@echo "Compiling (Release) $< to $@"
 	@mkdir -p $(OBJDIR)
-	@erlc -pa /usr/lib/yaws/ebin -pa $(EBINDIR) -o $(OBJDIR) $<
+	@erlc $(PKGS) -o $(OBJDIR) $<
 
 tests:
 	@echo "Running unit tests.."
-	@erl -noshell -pa $(EBINDIR) \
+	@erl -noshell $(PKGS) \
 	-eval "eunit:test(\"$(EBINDIR)\", [verbose])" \
+	-yaws embedded true \
 	 -s init stop
 
 $(DOCDIR)/index.html:
 	@echo "Generating documentation.."
-	erl -noshell -pa $(EBINDIR) \
+	erl -noshell $(PKGS) \
 	-eval "edoc:application($(NAME), \".\", [{dir, \"$(DOCDIR)\"}])" \
 	 -s init stop
 
