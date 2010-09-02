@@ -14,7 +14,7 @@ start_link(Args) ->
 
 init([Port]) ->
 
-    {ok, TestChain} = yaws_security:create_filterchain([test_filter]),
+    {ok, TestChain} = yaws_security:create_filterchain([{test_filter, null}]),
     ok = yaws_security:create_realm("/", TestChain, test_handler),
 
     GC = yaws_config:make_default_gconf(false, "test-server"),
