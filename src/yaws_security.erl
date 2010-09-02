@@ -1,6 +1,7 @@
 -module(yaws_security).
 -behaviour(gen_server).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("yaws_security.hrl").
 
 -export([
     start_link/1, init/1,
@@ -8,9 +9,10 @@
     terminate/2, code_change/3
 ]).
 
--export([register_filterchain/2, register_realm/4, resolve_handler/2]).
+-export([register_filterchain/2, register_realm/4,
+	 register_provider/2, resolve_handler/2]).
 
--record(state, {filterchains, nextid, realms}).
+-record(state, {filterchains, nextid, realms, providers}).
 -record(filterchain, {id, filters}).
 -record(filter, {type, object}).
 -record(functionfilter, {function}).
@@ -21,7 +23,11 @@ start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
 init(_Args) ->
-    {ok, #state{filterchains = dict:new(), nextid = 0, realms = dict:new()}}.
+    {ok, #state{filterchains = dict:new(),
+		nextid = 0,
+		realms = dict:new(),
+		providers = dict:new()
+	       }}.
 
 % @doc registers a new filterchain
 register_filterchain(ChainSpec, Options) ->
@@ -30,8 +36,14 @@ register_filterchain(ChainSpec, Options) ->
 register_realm(Path, ChainId, Handler, Options) ->
     gen_server:call(?MODULE, {register_realm, Path, ChainId, Handler, Options}).
 
+register_provider(Types, Provider) ->
+    gen_server:call(?MODULE, {register_provider, Types, Provider}).
+
 resolve_handler(Path, Options) ->
     gen_server:call(?MODULE, {resolve_handler, Path, Options}).
+
+authenticate(Token) ->
+    gen_server:call(?MODULE, {authenticate, Token}).
 
 handle_call({register_filterchain, ChainSpec, []}, _From, State) ->
 
@@ -70,6 +82,28 @@ handle_call({resolve_handler, Path, []}, _From, State) ->
     EvaluatedRealms = [eval_match(Path, X) || {_, X} <- RealmsList],
     find_best_chain(EvaluatedRealms, nomatch, State);
 
+handle_call({register_provider, Types, Provider}, _From, State) ->
+    case check_existing_providers(Types, State#state.providers) of
+	ok ->
+	    install_provider(Types, Provider, State);
+	conflict ->
+	    {reply, {error, conflict}, State}
+    end;
+
+handle_call({authenticate, Token}, _From, State) ->
+    Type = Token#token.type,
+    case dict:find(Type, State#state.providers) of
+	{ok, Provider} ->
+	    case Provider(Token) of
+		{ok, NewToken} ->
+		    {reply, {ok, NewToken}, State};
+		Reason ->
+		    {reply, {error, Reason}, State}
+	    end;
+	_ ->
+	    {reply, {error, unsupported_type}, State}
+    end;
+
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
 
 handle_cast(_Message, State) -> {noreply, State}.
@@ -80,6 +114,22 @@ terminate(_Reason, _State) ->
     ok.
 
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
+
+check_existing_providers([Type | T], Providers) ->
+    case dict:find(Type, Providers) of
+	{ok, _} ->
+	    conflict;
+	error ->
+	    check_existing_providers(T, Providers)
+    end;
+check_existing_providers([], _Providers) ->
+    ok.
+
+install_provider([], Provider, State) ->
+    {reply, ok, State};
+install_provider([Type | T], Provider, State) ->
+    Providers = dict:store(Type, Provider, State#state.providers),
+    install_provider(T, Provider, State#state{providers = Providers}).
 
 find_best_chain([nomatch | T], Best, State) ->
     find_best_chain(T, Best, State);
@@ -159,3 +209,17 @@ filter_test() ->
     {ok, Chain2, {function, Handler2}} = resolve_handler("/good/path/even/better/foo", []),
     ?debugFmt("Chain1: ~p~n", [Chain1]),
     {error, notfound} = resolve_handler("/bad/path", []).
+
+%------------
+% provider tests
+
+testauth(Token) when is_record(Token, token) ->
+    {ok, Token#token{authenticated=true}}.
+
+providers_test() ->
+    Provider = fun(Token) -> testauth(Token) end,
+    ok = register_provider([basic, foo], Provider),
+    {error, conflict} = register_provider([foo, bar], Provider).
+
+					     
+    
