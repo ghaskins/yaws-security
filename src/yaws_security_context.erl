@@ -12,7 +12,7 @@
 
 -export([stop/1]).
 
--record(state, {}).
+-record(state, {token}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -23,6 +23,11 @@ init(_Args) ->
 stop(Pid) ->
     gen_server:call(Pid, stop).
 
+set(Pid, Token) when is_record(Token, token) ->
+    gen_server:call(Pid, {set, Token}).
+
+handle_call({set, Token}, _From, State) ->
+    {reply, ok, State#state{token=Token}};
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
