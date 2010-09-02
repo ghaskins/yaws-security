@@ -66,7 +66,6 @@ handle_call({find_chain, Path}, _From, State) ->
     RealmsList = dict:to_list(State#state.realms),
 
     EvaluatedRealms = [eval_match(Path, X) || {_, X} <- RealmsList],
-    ?debugFmt("Path: ~p Realm: ~p~n", [Path, EvaluatedRealms]),
     find_best_chain(EvaluatedRealms, nomatch, State);
 
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
@@ -106,7 +105,6 @@ eval_match(Path, Realm) ->
 	1 ->
 	    {match, string:len(Realm#realm.path), Realm};
 	Val ->
-	    ?debugFmt("~s != ~s (~p)~n", [Path, Realm#realm.path, Val]),
 	    nomatch
     end.
 
@@ -151,9 +149,5 @@ filter_test() ->
 						       TestChain, bad_handler),
 
     {ok, Chain1, Handler1} = find_chain("/good/path/and/then/some"),
-    ?debugFmt("1: Chain: ~p Handler: ~p~n", [Chain1, Handler1]),
-
     {ok, Chain2, Handler2} = find_chain("/good/path/even/better/foo"),
-    ?debugFmt("2: Chain: ~p Handler: ~p~n", [Chain2, Handler2]),
-
     {error, notfound} = find_chain("/bad/path").
