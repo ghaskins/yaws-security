@@ -97,8 +97,9 @@ find_best_chain([], nomatch, State) ->
 find_best_chain([], {match, _, Realm}, State) ->
     ChainId = Realm#realm.chain,
     {ok, FilterChain} = dict:find(ChainId, State#state.filterchains),
-
-    {reply, {ok, FilterChain, Realm#realm.handler}, State}.
+    Objects = [X#filter.object || X <- FilterChain#filterchain.filters],
+    Functions = [{function, X#functionfilter.function} || X <- Objects],
+    {reply, {ok, Functions, {function, Realm#realm.handler}}, State}.
 
 eval_match(Path, Realm) ->
     case Index = string:str(Path, Realm#realm.path) of
@@ -148,6 +149,7 @@ filter_test() ->
     {error, bad_handler} = yaws_security:create_realm("/bogus",
 						       TestChain, bad_handler),
 
-    {ok, Chain1, Handler1} = find_chain("/good/path/and/then/some"),
-    {ok, Chain2, Handler2} = find_chain("/good/path/even/better/foo"),
+    {ok, Chain1, {function, Handler1}} = find_chain("/good/path/and/then/some"),
+    {ok, Chain2, {function, Handler2}} = find_chain("/good/path/even/better/foo"),
+    ?debugFmt("Chain1: ~p~n", [Chain1]),
     {error, notfound} = find_chain("/bad/path").
