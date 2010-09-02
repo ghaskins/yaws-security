@@ -5,6 +5,7 @@ commaspace := ,$(space)
 NAME=yaws_security
 OBJDIR=./obj
 EBINDIR=$(OBJDIR)/$(NAME)/ebin
+DOCDIR=$(OBJDIR)/$(NAME)/doc
 SRCS += $(shell find src/*.erl)
 OBJS = $(patsubst src/%.erl,$(EBINDIR)/%.beam,$(SRCS))
 WSMODULES = $(patsubst src/%.erl,%, $(SRCS))
@@ -16,7 +17,7 @@ all: application release
 
 application: $(OBJS) $(EBINDIR)/$(NAME).app Makefile
 
-release: $(OBJDIR)/$(NAME).boot tests Makefile
+release: $(OBJDIR)/$(NAME).boot tests doc Makefile
 
 $(EBINDIR)/$(NAME).app: $(NAME).app Makefile
 	@echo "Compiling (APPSPEC) $< to $@"
@@ -40,6 +41,14 @@ tests:
 	@erl -noshell -pa $(EBINDIR) \
 	-eval "eunit:test(\"$(EBINDIR)\", [verbose])" \
 	 -s init stop
+
+$(DOCDIR)/index.html:
+	@echo "Generating documentation.."
+	erl -noshell -pa $(EBINDIR) \
+	-eval "edoc:application($(NAME), \".\", [{dir, \"$(DOCDIR)\"}])" \
+	 -s init stop
+
+doc: $(DOCDIR)/index.html
 
 clean: 
 	@rm -f *~

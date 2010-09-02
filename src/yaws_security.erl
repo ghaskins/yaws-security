@@ -23,6 +23,7 @@ start_link(Args) ->
 init(_Args) ->
     {ok, #state{filterchains = dict:new(), nextid = 0, realms = dict:new()}}.
 
+% @doc registers a new filterchain
 register_filterchain(ChainSpec, Options) ->
     gen_server:call(?MODULE, {register_filterchain, ChainSpec, Options}).
 
