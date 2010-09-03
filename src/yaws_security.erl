@@ -59,12 +59,11 @@ handle_call({register_filterchain, Id, ChainSpec, []}, _From, State) ->
 	{ok, _} ->
 	    {reply, {error, exists}, State};
 	error ->
-	    Filters = [F || {function, F} <- ChainSpec],
-	    Chain = #filterchain{id = Id, filters = Filters},
-	    UpdateChain = dict:store(Id, Chain, State#state.filterchains),
-	    
-	    NewState = State#state{filterchains = UpdateChain},
-	    {reply, ok, NewState}
+	    try register_filterchain({Id, ChainSpec, State})
+	    catch
+		throw:{invalidspec, BadSpec} ->
+		    {reply, {error, {invalid_filterspec, BadSpec}}, State}
+	    end
     end;
 
 % @private
@@ -146,6 +145,19 @@ check_existing_providers([Type | T], Providers) ->
     end;
 check_existing_providers([], _Providers) ->
     ok.
+
+register_filterchain({Id, ChainSpec, State}) ->
+    Filters = [process_filterspec(F) || F <- ChainSpec],
+    Chain = #filterchain{id = Id, filters = Filters},
+    FilterChains = dict:store(Id, Chain, State#state.filterchains),
+
+    {reply, ok, State#state{filterchains = FilterChains}}.
+
+% @private
+process_filterspec({function, F}) ->
+    F;
+process_filterspec(BadSpec) ->
+    throw({invalidspec, BadSpec}).
 
 % @private
 install_provider([], Provider, State) ->
@@ -236,6 +248,13 @@ filter_test() ->
     {ok, Chain2, Handler2} = resolve_handler("/good/path/even/better/foo", []),
     ?debugFmt("Chain1: ~p~n", [Chain1]),
     {error, notfound} = resolve_handler("/bad/path", []).
+
+bad_filterspec_test() ->
+    {error, {invalid_filterspec, garbage}} = yaws_security:register_filterchain(
+					       badchain,
+					       [garbage],
+					       []
+					      ).
 
 %------------
 % provider tests
