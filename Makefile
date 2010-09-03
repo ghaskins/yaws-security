@@ -45,7 +45,7 @@ tests:
 	-yaws embedded true \
 	 -s init stop
 
-$(DOCDIR)/index.html:
+$(DOCDIR)/index.html: $(OBJS) Makefile
 	@echo "Generating documentation.."
 	erl -noshell $(PKGS) \
 	-eval "edoc:application($(NAME), \".\", [{dir, \"$(DOCDIR)\"}])" \

@@ -1,3 +1,4 @@
+% @private
 -module(yaws_security_app).
 -behavior(application).
 -export([start/2, stop/1]).

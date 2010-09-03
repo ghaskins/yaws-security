@@ -1,3 +1,4 @@
+% @private
 -module(yaws_security_sup).
 -behavior(supervisor).
 -export([start_link/0]).

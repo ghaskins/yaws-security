@@ -14,9 +14,11 @@
 
 -record(state, {token}).
 
+% @private
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+% @private
 init(_Args) ->
     {ok, #state{token=null}}.
 
@@ -39,6 +41,7 @@ caller_in_role(Ctx, Role) when is_record(Ctx, context); is_atom(Role) ->
 	_ -> throw(unauthorized)
     end.
 
+% @private
 caller_in_role(Role, Token, State) when Token =:= null ->
     {reply, {error, notoken}, State};
 caller_in_role(Role, Token=#token{authenticated=false}, State) ->
@@ -56,27 +59,36 @@ caller_in_role(Role, Token=#token{authenticated=true}, State) ->
 	    {reply, no, State}
     end.
 
+% @private
 handle_call({caller_in_role, Role}, _From, State) ->
     caller_in_role(Role, State#state.token, State);
 
+% @private
 handle_call({set, Token}, _From, State) ->
     {reply, ok, State#state{token=Token}};
 
+% @private
 handle_call(get, _From, State) when State#state.token =/= null ->
     {reply, {ok, State#state.token}, State};
 handle_call(get, _From, State) when State#state.token =:= null ->
     {reply, null, State};
 
+% @private
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
+% @private
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
 
+% @private
 handle_cast(_Message, State) -> {noreply, State}.
 
+% @private
 handle_info(_Info, State) -> {noreply, State}.
 
+% @private
 terminate(_Reason, _State) ->
     ok.
 
+% @private
 code_change(_OldVsn, State, _Extra) -> {ok, State}.

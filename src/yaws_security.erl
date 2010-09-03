@@ -19,9 +19,11 @@
 
 -record(realm, {path, chain, handler}).
 
+% @private
 start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
+% @private
 init(_Args) ->
     {ok, #state{filterchains = dict:new(),
 		nextid = 0,
@@ -29,7 +31,16 @@ init(_Args) ->
 		providers = dict:new()
 	       }}.
 
+%-----------------------------------------------------------
 % @doc registers a new filterchain
+% @spec register_filterchain(ChainSpec::chainspec(), Options::List) -> ok
+% where
+%   chainspec() = [filterspec()]
+%   filterspec() = {function, fun()}
+%   List = []						
+%
+% @end
+%-----------------------------------------------------------
 register_filterchain(ChainSpec, Options) ->
     gen_server:call(?MODULE, {register_filterchain, ChainSpec, Options}).
 
@@ -45,6 +56,7 @@ resolve_handler(Path, Options) ->
 authenticate(Token) ->
     gen_server:call(?MODULE, {authenticate, Token}).
 
+% @private
 handle_call({register_filterchain, ChainSpec, []}, _From, State) ->
 
     ChainId = State#state.nextid,
@@ -56,6 +68,7 @@ handle_call({register_filterchain, ChainSpec, []}, _From, State) ->
     NewState = State#state{filterchains = UpdateChain, nextid = ChainId+1},
     {reply, {ok, ChainId}, NewState};
 
+% @private
 handle_call({register_realm, Path, ChainId, {function, Handler}, []},
 	    _From, State) ->
     case dict:find(Path, State#state.realms) of
@@ -73,15 +86,18 @@ handle_call({register_realm, Path, ChainId, {function, Handler}, []},
 	    end
     end;
 
+% @private
 handle_call({register_realm, Path, ChainId, Handler, []}, _From, State) ->
     {reply, {error, bad_handler}, State};
 
+% @private
 handle_call({resolve_handler, Path, []}, _From, State) ->
     RealmsList = dict:to_list(State#state.realms),
 
     EvaluatedRealms = [eval_match(Path, X) || {_, X} <- RealmsList],
     find_best_chain(EvaluatedRealms, nomatch, State);
 
+% @private
 handle_call({register_provider, Types, Provider}, _From, State) ->
     case check_existing_providers(Types, State#state.providers) of
 	ok ->
@@ -90,6 +106,7 @@ handle_call({register_provider, Types, Provider}, _From, State) ->
 	    {reply, {error, conflict}, State}
     end;
 
+% @private
 handle_call({authenticate, Token}, _From, State) ->
     Type = Token#token.type,
     case dict:find(Type, State#state.providers) of
@@ -104,17 +121,23 @@ handle_call({authenticate, Token}, _From, State) ->
 	    {reply, {error, unsupported_type}, State}
     end;
 
+% @private
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
 
+% @private
 handle_cast(_Message, State) -> {noreply, State}.
 
+% @private
 handle_info(_Info, State) -> {noreply, State}.
 
+% @private
 terminate(_Reason, _State) ->
     ok.
 
+% @private
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
+% @private
 check_existing_providers([Type | T], Providers) ->
     case dict:find(Type, Providers) of
 	{ok, _} ->
@@ -125,12 +148,14 @@ check_existing_providers([Type | T], Providers) ->
 check_existing_providers([], _Providers) ->
     ok.
 
+% @private
 install_provider([], Provider, State) ->
     {reply, ok, State};
 install_provider([Type | T], Provider, State) ->
     Providers = dict:store(Type, Provider, State#state.providers),
     install_provider(T, Provider, State#state{providers = Providers}).
 
+% @private
 find_best_chain([nomatch | T], Best, State) ->
     find_best_chain(T, Best, State);
 find_best_chain([Current | T], nomatch, State) ->
@@ -153,6 +178,7 @@ find_best_chain([], {match, _, Realm}, State) ->
     Functions = [{function, X#functionfilter.function} || X <- Objects],
     {reply, {ok, Functions, {function, Realm#realm.handler}}, State}.
 
+% @private
 eval_match(Path, Realm) ->
     case Index = string:str(Path, Realm#realm.path) of
 	1 ->
