@@ -40,6 +40,7 @@ $(OBJDIR)/$(NAME).boot: $(NAME).rel application
 
 clean: 
 	@rm -f *~
+	@rm -f ./src/*~
 	@rm -rf obj
 	@rm -f *.dump
 
