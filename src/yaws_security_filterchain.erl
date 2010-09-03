@@ -88,12 +88,14 @@ rest_test() ->
     Handler = fun(Arg, Ctx) -> testhandler(Arg, Ctx) end,
     Provider = fun(Token) -> saprovider(Token) end,
     
-    {ok, Chain} = yaws_security:register_filterchain(
-		    [{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end},
-		     {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, b) end},
-		     {function, fun(Arg, Ctx) -> safilter(Arg, Ctx) end}],
-		    []),
-    ok = yaws_security:register_realm("/", Chain, {function, Handler}, []),
+    ok = yaws_security:register_filterchain(
+	   resttest_chain,
+	   [{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end},
+	    {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, b) end},
+	    {function, fun(Arg, Ctx) -> safilter(Arg, Ctx) end}],
+	   []),
+    ok = yaws_security:register_realm("/", resttest_chain,
+				      {function, Handler}, []),
     ok = yaws_security:register_provider([simple], Provider),
 
     application:start(yaws),

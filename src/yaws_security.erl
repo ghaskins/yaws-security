@@ -9,10 +9,10 @@
     terminate/2, code_change/3
 ]).
 
--export([register_filterchain/2, register_realm/4,
+-export([register_filterchain/3, register_realm/4,
 	 register_provider/2, resolve_handler/2, authenticate/1]).
 
--record(state, {filterchains, nextid, realms, providers}).
+-record(state, {filterchains, realms, providers}).
 -record(filterchain, {id, filters}).
 -record(filter, {type, object}).
 -record(functionfilter, {function}).
@@ -26,14 +26,13 @@ start_link(Args) ->
 % @private
 init(_Args) ->
     {ok, #state{filterchains = dict:new(),
-		nextid = 0,
 		realms = dict:new(),
 		providers = dict:new()
 	       }}.
 
 %-----------------------------------------------------------
 % @doc registers a new filterchain
-% @spec register_filterchain(ChainSpec::chainspec(), Options::List) -> ok
+% @spec register_filterchain(Id::atom(), ChainSpec::chainspec(), Options::List) -> ok
 % where
 %   chainspec() = [filterspec()]
 %   filterspec() = {function, fun()}
@@ -41,8 +40,8 @@ init(_Args) ->
 %
 % @end
 %-----------------------------------------------------------
-register_filterchain(ChainSpec, Options) ->
-    gen_server:call(?MODULE, {register_filterchain, ChainSpec, Options}).
+register_filterchain(Id, ChainSpec, Options) ->
+    gen_server:call(?MODULE, {register_filterchain, Id, ChainSpec, Options}).
 
 register_realm(Path, ChainId, Handler, Options) ->
     gen_server:call(?MODULE, {register_realm, Path, ChainId, Handler, Options}).
@@ -57,16 +56,19 @@ authenticate(Token) ->
     gen_server:call(?MODULE, {authenticate, Token}).
 
 % @private
-handle_call({register_filterchain, ChainSpec, []}, _From, State) ->
-
-    ChainId = State#state.nextid,
-    Filters = [#filter{type=function, object=#functionfilter{function=F}}
-	       || {function, F} <- ChainSpec],
-    Chain = #filterchain{id = ChainId, filters = Filters},
-    UpdateChain = dict:store(ChainId, Chain, State#state.filterchains),
-
-    NewState = State#state{filterchains = UpdateChain, nextid = ChainId+1},
-    {reply, {ok, ChainId}, NewState};
+handle_call({register_filterchain, Id, ChainSpec, []}, _From, State) ->
+    case dict:find(Id, State#state.filterchains) of
+	{ok, _} ->
+	    {reply, {error, exists}, State};
+	error ->
+	    Filters = [#filter{type=function, object=#functionfilter{function=F}}
+		       || {function, F} <- ChainSpec],
+	    Chain = #filterchain{id = Id, filters = Filters},
+	    UpdateChain = dict:store(Id, Chain, State#state.filterchains),
+	    
+	    NewState = State#state{filterchains = UpdateChain},
+	    {reply, ok, NewState}
+    end;
 
 % @private
 handle_call({register_realm, Path, ChainId, {function, Handler}, []},
@@ -205,21 +207,24 @@ filter_test() ->
     Handler1 = fun(Arg, Ctx) -> first_handler(Arg, Ctx) end,
     Handler2 = fun(Arg, Ctx) -> second_handler(Arg, Ctx) end,
 
-    {ok, TestChain} = yaws_security:register_filterchain(
-			[{function, fun(Arg, Ctx) -> myfilter(Arg, Ctx) end}], []),
+    ok = yaws_security:register_filterchain(
+	   mychain,
+	   [{function, fun(Arg, Ctx) -> myfilter(Arg, Ctx) end}],
+	   []
+	  ),
     ok = yaws_security:register_realm("/good/path",
-				      TestChain,
+				      mychain,
 				      {function, Handler1},
 				      []
 				   ),
     ok = yaws_security:register_realm("/good/path/even/better",
-				      TestChain,
+				      mychain,
 				      {function, Handler2},
 				      []
 				     ),
 
     {error, exists} = yaws_security:register_realm("/good/path",
-						   TestChain,
+						   mychain,
 						   {function, Handler2},
 						   []
 						  ),
@@ -229,7 +234,7 @@ filter_test() ->
 							 []
 							),
     {error, bad_handler} = yaws_security:register_realm("/bogus",
-						       TestChain, bad_handler, []),
+						       mychain, bad_handler, []),
 
     {ok, Chain1, {function, Handler1}} = resolve_handler("/good/path/and/then/some", []),
     {ok, Chain2, {function, Handler2}} = resolve_handler("/good/path/even/better/foo", []),
