@@ -35,9 +35,9 @@ process(Arg, Chain, Handler) ->
 	yaws_security_context:stop(Pid)
     end.
 
-next(Arg, Ctx=#context{chain=[{function, FilterFun} | T]}) ->
+next(Arg, Ctx=#context{chain=[FilterFun | T]}) ->
     FilterFun(Arg, Ctx#context{chain=T});
-next(Arg, Ctx=#context{chain=[], handler={function, HandlerFun}}) ->
+next(Arg, Ctx=#context{chain=[], handler=HandlerFun}) ->
     HandlerFun(Arg, Ctx).
 
 %----------------------------------------------------------------------
