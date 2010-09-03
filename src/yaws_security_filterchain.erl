@@ -69,7 +69,7 @@ process_header([]) ->
 
 saprovider(Token) ->
     GrantedAuthorities = [role_user],
-    ?debugFmt("Authenticating: ~p~n", [Token]),
+    ?debugFmt("SIMPLEAUTH: Authenticating: ~p~n", [Token]),
     {ok, Token#token{
 	   authenticated=true,
 	   granted_authorities=sets:from_list(GrantedAuthorities)
@@ -83,12 +83,16 @@ testhandler(Arg, Ctx) ->
 
 rest_test() ->
 
+    yaws_security_basicauth:init(),
+
     Handler = fun(Arg, Ctx) -> testhandler(Arg, Ctx) end,
     Provider = fun(Token) -> saprovider(Token) end,
     
     ok = yaws_security:register_filterchain(
 	   resttest_base_chain,
-	   [{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end}],
+	   [ {chain, basic_auth},
+	     {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end}
+	   ],
 	   []),
     ok = yaws_security:register_filterchain(
 	   resttest_chain,
@@ -99,6 +103,18 @@ rest_test() ->
     ok = yaws_security:register_realm("/", resttest_chain,
 				      {function, Handler}, []),
     ok = yaws_security:register_provider([simple], Provider),
+
+    ok = yaws_security_basicauth:register_provider(
+	   [role_user],
+	   [#basicauth_record{principal="admin",
+			      password="admin",
+			      granted_authorities=[role_admin]
+			     },
+	    #basicauth_record{principal="user",
+			      password="user"
+			     }
+	   ]
+	  ),
 
     application:start(yaws),
 
@@ -124,6 +140,12 @@ rest_test() ->
 
     {ok, {{_, 200, _}, _, _}} =
 	http:request(get, {Url, [{"Authentication", "admin"}]}, [], []),
+    
+    {ok, {{_, 401, _}, _, _}} =
+	http:request(get, {"http://admin:badpass@localhost:8000", []}, [], []),
+
+    {ok, {{_, 200, _}, _, _}} =
+	http:request(get, {"http://admin:admin@localhost:8000", []}, [], []),
     
     ok.
     

@@ -112,7 +112,7 @@ handle_call({authenticate, Token}, _From, State) ->
 	    case Provider(Token) of
 		{ok, NewToken} ->
 		    {reply, {ok, NewToken}, State};
-		Reason ->
+		{error, Reason} ->
 		    {reply, {error, Reason}, State}
 	    end;
 	_ ->
@@ -297,7 +297,7 @@ testauth(Token) when is_record(Token, token) ->
 
 providers_test() ->
     Provider = fun(Token) -> testauth(Token) end,
-    ok = register_provider([basic, foo], Provider),
+    ok = register_provider([foo], Provider),
     {error, conflict} = register_provider([foo, bar], Provider).
 
 					     
