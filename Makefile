@@ -12,10 +12,14 @@ WSMODULES = $(patsubst src/%.erl,%, $(SRCS))
 MODULES = $(subst $(space),$(commaspace), $(WSMODULES))
 INCLUDES += -I/usr/lib
 INCLUDES += -I./include
+EFLAGS += $(INCLUDES)
+ifeq ($(TYPE),debug)
+EFLAGS += -Ddebug +debug_info
+endif
 PKGS += -pa /usr/lib/yaws/ebin
 PKGS += -pa $(EBINDIR)
 
-all: application release
+all debug: application release
 
 application: $(OBJS) $(EBINDIR)/$(NAME).app Makefile
 
@@ -31,7 +35,7 @@ $(EBINDIR)/%.beam: src/%.erl Makefile
 	@touch $(NAME).app
 	@echo "Compiling (Erlang) $< to $@"
 	@mkdir -p $(EBINDIR)
-	@erlc $(INCLUDES) -o $(EBINDIR) $<
+	erlc $(EFLAGS) -o $(EBINDIR) $<
 
 $(OBJDIR)/$(NAME).boot: $(NAME).rel application
 	@echo "Compiling (Release) $< to $@"
@@ -59,4 +63,8 @@ clean:
 	@rm -rf obj
 	@rm -f *.dump
 
+$(NAME).plt:	
+	dialyzer --build_plt -r $(EBINDIR) --output_plt $(NAME).plt
 
+dialyzer: $(NAME).plt
+	dialyzer --plt $(NAME).plt -r .
