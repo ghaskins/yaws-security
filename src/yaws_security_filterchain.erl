@@ -7,7 +7,7 @@
 
 -include_lib("yaws_security.hrl").
 
--export([out/1]).
+-export([out/1, next/2]).
 
 % Standard YAWS callback.  Acts as the packet entry point to yaws_security
 out(Arg) -> 
