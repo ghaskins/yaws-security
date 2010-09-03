@@ -10,7 +10,7 @@
     terminate/2, code_change/3
 ]).
 
--export([stop/1]).
+-export([stop/1, token_set/2, token_get/1, caller_in_role/2]).
 
 -record(state, {token}).
 
@@ -18,18 +18,58 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_Args) ->
-    {ok, #state{}}.
+    {ok, #state{token=null}}.
 
 stop(Pid) ->
     gen_server:call(Pid, stop).
 
-set(Pid, Token) when is_record(Token, token) ->
+token_set(Ctx, Token) when is_record(Ctx, context), is_record(Token, token) ->
+    token_set(Ctx#context.pid, Token);
+token_set(Pid, Token) when is_pid(Pid), is_record(Token, token) ->
     gen_server:call(Pid, {set, Token}).
+
+token_get(Ctx) when is_record(Ctx, context) ->
+    token_get(Ctx#context.pid);
+token_get(Pid) ->
+    gen_server:call(Pid, get).
+
+caller_in_role(Ctx, Role) when is_record(Ctx, context); is_atom(Role) ->
+    case gen_server:call(Ctx#context.pid, {caller_in_role, Role}) of
+	ok -> ok;
+	_ -> throw(unauthorized)
+    end.
+
+caller_in_role(Role, Token, State) when Token =:= null ->
+    {reply, {error, notoken}, State};
+caller_in_role(Role, Token=#token{authenticated=false}, State) ->
+    case yaws_security:authenticate(Token) of
+	{ok, NewToken} ->
+	    caller_in_role(Role, NewToken, State#state{token = NewToken});
+	{error, Reason} ->
+	    {reply, {error, Reason}, State}
+    end;
+caller_in_role(Role, Token=#token{authenticated=true}, State) ->
+    case sets:is_element(Role, Token#token.granted_authorities) of
+	true ->
+	    {reply, ok, State};
+	false ->
+	    {reply, no, State}
+    end.
+
+handle_call({caller_in_role, Role}, _From, State) ->
+    caller_in_role(Role, State#state.token, State);
 
 handle_call({set, Token}, _From, State) ->
     {reply, ok, State#state{token=Token}};
+
+handle_call(get, _From, State) when State#state.token =/= null ->
+    {reply, {ok, State#state.token}, State};
+handle_call(get, _From, State) when State#state.token =:= null ->
+    {reply, null, State};
+
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
+
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
 
 handle_cast(_Message, State) -> {noreply, State}.

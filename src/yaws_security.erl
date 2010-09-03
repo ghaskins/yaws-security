@@ -10,7 +10,7 @@
 ]).
 
 -export([register_filterchain/2, register_realm/4,
-	 register_provider/2, resolve_handler/2]).
+	 register_provider/2, resolve_handler/2, authenticate/1]).
 
 -record(state, {filterchains, nextid, realms, providers}).
 -record(filterchain, {id, filters}).

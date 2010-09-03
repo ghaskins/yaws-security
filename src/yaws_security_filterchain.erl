@@ -25,11 +25,15 @@ process(Arg, Chain, Handler) ->
 
     Ctx = #context{pid = Pid, chain = Chain, handler = Handler},
     
-    Ret = next(Arg, Ctx),
-    
-    yaws_security_context:stop(Pid),
-
-    Ret.
+    try next(Arg, Ctx) of
+	Ret ->
+	    Ret
+    catch
+	throw:unauthorized ->
+	    [{status, 401}]
+    after
+	yaws_security_context:stop(Pid)
+    end.
 
 next(Arg, Ctx=#context{chain=[{function, FilterFun} | T]}) ->
     FilterFun(Arg, Ctx#context{chain=T});
@@ -42,19 +46,55 @@ testfilter(Arg, Ctx, State) ->
     ?debugFmt("testfilter: Ctx: ~p State: ~p~n", [Ctx, State]),
     next(Arg, Ctx).
 
+safilter(Arg, Ctx) ->
+    case yaws_security_context:token_get(Ctx) of
+	{ok, _} ->
+	    ok;
+	null ->
+	    Req = Arg#arg.req,
+	    Headers = Arg#arg.headers,
+	    case process_header(Headers#headers.other) of
+		{ok, Principal} ->
+		    Token = #token{type=simple, principal=Principal},
+		    ok = yaws_security_context:token_set(Ctx, Token);
+		_ -> ok
+	    end
+    end,
+    next(Arg, Ctx).
+
+process_header([{http_header, _Num, "Authentication", _, SaUser} | T]) ->
+    {ok, SaUser};
+process_header([{http_header, _, _, _, _} | T]) ->
+    process_header(T);
+process_header([]) ->
+    not_found.
+
+saprovider(Token) ->
+    GrantedAuthorities = [role_user],
+    ?debugFmt("Authenticating: ~p~n", [Token]),
+    {ok, Token#token{
+	   authenticated=true,
+	   granted_authorities=sets:from_list(GrantedAuthorities)
+	  }
+    }.
+
 testhandler(Arg, Ctx) ->
+    yaws_security_context:caller_in_role(Ctx, role_user),
     ?debugFmt("testhandler: ~p~n", [Ctx]),
     [{status, 200}].
 
 rest_test() ->
 
     Handler = fun(Arg, Ctx) -> testhandler(Arg, Ctx) end,
+    Provider = fun(Token) -> saprovider(Token) end,
     
     {ok, Chain} = yaws_security:register_filterchain(
 		    [{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end},
-		     {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, b) end}],
+		     {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, b) end},
+		     {function, fun(Arg, Ctx) -> safilter(Arg, Ctx) end}],
 		    []),
     ok = yaws_security:register_realm("/", Chain, {function, Handler}, []),
+    ok = yaws_security:register_provider([simple], Provider),
 
     application:start(yaws),
 
@@ -75,8 +115,11 @@ rest_test() ->
     
     application:start(inets),
     Url = "http://localhost:8000",
-    {ok, {{HttpVer, 200, Msg}, Headers, Body}} =
-	http:request(get, {Url, []}, [], []),
+    {ok, {{_, 401, _}, _, _}} =
+	http:request(Url),
+
+    {ok, {{_, 200, _}, _, _}} =
+	http:request(get, {Url, [{"Authentication", "admin"}]}, [], []),
     
     ok.
     
