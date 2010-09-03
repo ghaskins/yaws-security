@@ -249,22 +249,29 @@ filter_test() ->
 				      []
 				     ),
 
-    {error, exists} = yaws_security:register_realm("/good/path",
-						   mychain,
-						   {function, Handler2},
-						   []
-						  ),
-    {error, bad_chain_id} = yaws_security:register_realm("/bogus",
-							 badid,
-							 {function, Handler1},
-							 []
-							),
-    {error, bad_handler} = yaws_security:register_realm("/bogus",
-							mychain, bad_handler, []),
-
+    {error, exists}
+	= yaws_security:register_realm(
+	    "/good/path",
+	    mychain,
+	    {function, Handler2},
+	    []
+	   ),
+    {error, bad_chain_id}
+	= yaws_security:register_realm(
+	    "/bogus",
+	    badid,
+	    {function, Handler1},
+	    []
+	   ),
+    {error, bad_handler}
+	= yaws_security:register_realm(
+	    "/bogus",
+	    mychain,
+	    bad_handler,
+	    []),
+    
     {ok, Chain1, Handler1} = resolve_handler("/good/path/and/then/some", []),
-    {ok, Chain2, Handler2} = resolve_handler("/good/path/even/better/foo", []),
-    ?debugFmt("Chain1: ~p~n", [Chain1]),
+    {ok, Chain1, Handler2} = resolve_handler("/good/path/even/better/foo", []),
     {error, notfound} = resolve_handler("/bad/path", []).
 
 bad_filterspec_test() ->

@@ -43,7 +43,7 @@ next(Arg, Ctx=#context{chain=[], handler=HandlerFun}) ->
 %----------------------------------------------------------------------
 
 testfilter(Arg, Ctx, State) ->
-    ?debugFmt("testfilter: Ctx: ~p State: ~p~n", [Ctx, State]),
+    ?debugFmt("testfilter: ~p~n", [State]),
     next(Arg, Ctx).
 
 safilter(Arg, Ctx) ->
