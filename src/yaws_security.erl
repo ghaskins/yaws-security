@@ -14,8 +14,6 @@
 
 -record(state, {filterchains, realms, providers}).
 -record(filterchain, {id, filters}).
--record(filter, {type, object}).
--record(functionfilter, {function}).
 
 -record(realm, {path, chain, handler}).
 
@@ -61,8 +59,7 @@ handle_call({register_filterchain, Id, ChainSpec, []}, _From, State) ->
 	{ok, _} ->
 	    {reply, {error, exists}, State};
 	error ->
-	    Filters = [#filter{type=function, object=#functionfilter{function=F}}
-		       || {function, F} <- ChainSpec],
+	    Filters = [F || {function, F} <- ChainSpec],
 	    Chain = #filterchain{id = Id, filters = Filters},
 	    UpdateChain = dict:store(Id, Chain, State#state.filterchains),
 	    
@@ -176,8 +173,7 @@ find_best_chain([], nomatch, State) ->
 find_best_chain([], {match, _, Realm}, State) ->
     ChainId = Realm#realm.chain,
     {ok, FilterChain} = dict:find(ChainId, State#state.filterchains),
-    Objects = [X#filter.object || X <- FilterChain#filterchain.filters],
-    Functions = [X#functionfilter.function || X <- Objects],
+    Functions = [X || X <- FilterChain#filterchain.filters],
     {reply, {ok, Functions, Realm#realm.handler}, State}.
 
 % @private
