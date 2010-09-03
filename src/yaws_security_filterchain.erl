@@ -25,9 +25,7 @@ process(Arg, Chain, Handler) ->
 
     Ctx = #context{pid = Pid, chain = Chain, handler = Handler},
     
-    try next(Arg, Ctx) of
-	Ret ->
-	    Ret
+    try next(Arg, Ctx)
     catch
 	throw:unauthorized ->
 	    [{status, 401}]
