@@ -89,8 +89,12 @@ rest_test() ->
     Provider = fun(Token) -> saprovider(Token) end,
     
     ok = yaws_security:register_filterchain(
+	   resttest_base_chain,
+	   [{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end}],
+	   []),
+    ok = yaws_security:register_filterchain(
 	   resttest_chain,
-	   [{function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end},
+	   [{chain, resttest_base_chain},
 	    {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, b) end},
 	    {function, fun(Arg, Ctx) -> safilter(Arg, Ctx) end}],
 	   []),

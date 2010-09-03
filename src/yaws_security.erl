@@ -147,16 +147,23 @@ check_existing_providers([], _Providers) ->
     ok.
 
 register_filterchain({Id, ChainSpec, State}) ->
-    Filters = [process_filterspec(F) || F <- ChainSpec],
-    Chain = #filterchain{id = Id, filters = Filters},
+    Filters = [process_filterspec(F, State) || F <- ChainSpec],
+    Chain = #filterchain{id = Id, filters = lists:flatten(Filters)},
     FilterChains = dict:store(Id, Chain, State#state.filterchains),
 
     {reply, ok, State#state{filterchains = FilterChains}}.
 
 % @private
-process_filterspec({function, F}) ->
+process_filterspec({function, F}, _State) ->
     F;
-process_filterspec(BadSpec) ->
+process_filterspec({chain, ChainId}, State) ->
+    case dict:find(ChainId, State#state.filterchains) of
+	{ok, Chain} ->
+	    [F || F <- Chain#filterchain.filters];
+	_ ->
+	    throw({invalidspec, {chain, ChainId}})
+    end;
+process_filterspec(BadSpec, _State) ->
     throw({invalidspec, BadSpec}).
 
 % @private
@@ -215,11 +222,22 @@ filter_test() ->
     Handler1 = fun(Arg, Ctx) -> first_handler(Arg, Ctx) end,
     Handler2 = fun(Arg, Ctx) -> second_handler(Arg, Ctx) end,
 
+    % first, create a basic chain
     ok = yaws_security:register_filterchain(
 	   mychain,
 	   [{function, fun(Arg, Ctx) -> myfilter(Arg, Ctx) end}],
 	   []
 	  ),
+
+    % now create another that builds on the first
+    ok = yaws_security:register_filterchain(
+	   mycompositechain,
+	   [{chain, mychain},
+	    {function, fun(Arg, Ctx) -> myfilter(Arg, Ctx) end}
+	   ],
+	   []
+	  ),
+
     ok = yaws_security:register_realm("/good/path",
 				      mychain,
 				      {function, Handler1},
@@ -250,11 +268,19 @@ filter_test() ->
     {error, notfound} = resolve_handler("/bad/path", []).
 
 bad_filterspec_test() ->
-    {error, {invalid_filterspec, garbage}} = yaws_security:register_filterchain(
-					       badchain,
-					       [garbage],
-					       []
-					      ).
+    {error, {invalid_filterspec, garbage}}
+	= yaws_security:register_filterchain(
+	    badchain,
+	    [garbage],
+	    []
+	   ),
+
+    {error, {invalid_filterspec, {chain, nonexistant}}}
+	= yaws_security:register_filterchain(
+	    badchain,
+	    [{chain, nonexistant}],
+	    []
+	   ).
 
 %------------
 % provider tests
