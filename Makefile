@@ -39,7 +39,7 @@ $(EBINDIR)/%.beam: src/%.erl Makefile
 	@touch $(NAME).app
 	@echo "Compiling (Erlang) $< to $@"
 	@mkdir -p $(EBINDIR)
-	erlc $(EFLAGS) -o $(EBINDIR) $<
+	@erlc $(EFLAGS) -o $(EBINDIR) $<
 
 $(OBJDIR)/$(NAME).boot: $(NAME).rel application
 	@echo "Compiling (Release) $< to $@"
@@ -67,11 +67,11 @@ clean:
 	@rm -rf obj
 	@rm -f *.dump
 
-$(NAME).plt:	
-	dialyzer --build_plt -r $(EBINDIR) --output_plt $(NAME).plt \
+obj/$(NAME).plt:	
+	dialyzer --build_plt -r $(EBINDIR) --output_plt obj/$(NAME).plt \
 	-r $(ERLDIR)/lib/kernel-$(KERNEL_VSN) \
 	-r $(ERLDIR)/lib/stdlib-$(STDLIB_VSN) \
 	-r $(ERLDIR)/lib/erts-$(ERTS_VSN) 
 
-dialyzer: $(NAME).plt
-	dialyzer --plt $(NAME).plt -r $(EBINDIR)
+dialyzer: obj/$(NAME).plt
+	dialyzer --plt obj/$(NAME).plt -r $(EBINDIR)
