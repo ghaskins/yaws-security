@@ -3,9 +3,14 @@ space := $(nullstring) # a space at the end
 commaspace := ,$(space)
 
 NAME=yaws_security
+VERSION=0.1
+RELEASE=1
 OBJDIR=./obj
-EBINDIR=$(OBJDIR)/$(NAME)/ebin
-DOCDIR=$(OBJDIR)/$(NAME)/doc
+BASEDIR=$(OBJDIR)/$(NAME)-$(VERSION).$(RELEASE)
+EBINDIR=$(BASEDIR)/ebin
+DOCDIR=$(BASEDIR)/doc
+SHEADERS += $(shell find include/*.hrl)
+HEADERS = $(patsubst include/%.hrl,$(BASEDIR)/include/%.hrl,$(SHEADERS))
 SRCS += $(shell find src/*.erl)
 OBJS = $(patsubst src/%.erl,$(EBINDIR)/%.beam,$(SRCS))
 WSMODULES = $(patsubst src/%.erl,%, $(SRCS))
@@ -18,31 +23,35 @@ EFLAGS += -Ddebug +debug_info
 endif
 PKGS += -pa /usr/lib/yaws/ebin
 PKGS += -pa $(EBINDIR)
+RPMBIN=$(OBJDIR)/$(NAME)-$(VERSION).tar.gz
+INSTPATH ?= /tmp
 
-all: application release
+all: application doc tests
 
 application: $(OBJS) $(EBINDIR)/$(NAME).app Makefile
 
-release: $(OBJDIR)/$(NAME).boot tests doc Makefile
+$(BASEDIR)/include:
+	@mkdir -p $(BASEDIR)/include
 
-$(EBINDIR)/$(NAME).app: $(NAME).app Makefile
+$(BASEDIR)/include/%.hrl: include/%.hrl $(BASEDIR)/include
+	@cp $< $@
+
+$(EBINDIR)/$(NAME).app: $(NAME).app Makefile $(HEADERS)
 	@echo "Compiling (APPSPEC) $< to $@"
-	@cat $< | sed "s/__MODULES__/$(MODULES)/" | sed 's/\[, /\[/' > $@ 
+	cat $< | sed "s/__MODULES__/$(MODULES)/" | sed 's/\[, /\[/' \
+	| sed "s/__VERSION__/$(VERSION).$(RELEASE)/g" > $@ 
 
 $(OBJS): $(SRCS) Makefile
 
-$(EBINDIR)/%.beam: src/%.erl Makefile
+$(EBINDIR):
+	@mkdir -p $(EBINDIR)
+
+$(EBINDIR)/%.beam: src/%.erl Makefile $(EBINDIR)
 	@touch $(NAME).app
 	@echo "Compiling (Erlang) $< to $@"
-	@mkdir -p $(EBINDIR)
 	@erlc $(EFLAGS) -o $(EBINDIR) $<
 
-$(OBJDIR)/$(NAME).boot: $(NAME).rel application
-	@echo "Compiling (Release) $< to $@"
-	@mkdir -p $(OBJDIR)
-	@erlc $(PKGS) -o $(OBJDIR) $<
-
-tests:
+tests: application
 	@echo "Running unit tests.."
 	@erl -noshell $(PKGS) \
 	-eval "eunit:test(\"$(EBINDIR)\", [verbose])" \
@@ -69,3 +78,26 @@ obj/$(NAME).plt:
 
 dialyzer: obj/$(NAME).plt
 	dialyzer --plt obj/$(NAME).plt -r $(EBINDIR)
+
+$(INSTPATH):
+	@mkdir -p $(INSTPATH)
+
+install: $(INSTPATH)
+	@echo "Installing to $(INSTPATH)"
+	@cp -r $(OBJDIR)/* $(INSTPATH)
+
+$(OBJDIR)/$(NAME)-$(VERSION):
+	@mkdir -p $(OBJDIR)/$(NAME)-$(VERSION)
+
+$(OBJDIR)/$(NAME)-$(VERSION)/$(NAME).spec: $(OBJDIR)/$(NAME)-$(VERSION) $(NAME).spec Makefile
+	@echo "Installing RPM specfile $@"
+	@cat $(NAME).spec | sed -e 's/_RPM_VERSION/$(VERSION)/;s/_RPM_RELEASE/$(RELEASE)/' > $@
+
+.PHONY: $(RPMBIN)
+
+$(RPMBIN): $(OBJDIR)/$(NAME)-$(VERSION)/$(NAME).spec 
+	tar -c --exclude=.git --exclude=*.spec --exclude=*~ --exclude=obj * | (cd $(OBJDIR)/$(NAME)-$(VERSION); tar xf -)
+	(cd $(OBJDIR); tar cvz $(NAME)-$(VERSION)) > $(RPMBIN)
+
+srcrpm: $(RPMBIN)
+	rpmbuild -ts $(RPMBIN)
