@@ -4,7 +4,7 @@
 -include_lib("yaws_security.hrl").
 
 -export([
-    start_link/1, init/1,
+    start_link/0, init/1,
     handle_call/3, handle_cast/2, handle_info/2,
     terminate/2, code_change/3
 ]).
@@ -18,8 +18,8 @@
 -record(realm, {path, chain, handler}).
 
 % @private
-start_link(Args) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 % @private
 init(_Args) ->
@@ -217,7 +217,7 @@ second_handler(Arg, Ctx) ->
     [{status, 404}].
 
 filter_test() ->
-    start_link(0),
+    start_link(),
 
     Handler1 = fun(Arg, Ctx) -> first_handler(Arg, Ctx) end,
     Handler2 = fun(Arg, Ctx) -> second_handler(Arg, Ctx) end,
