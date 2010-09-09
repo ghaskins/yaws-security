@@ -18,10 +18,6 @@ EFLAGS += -Ddebug +debug_info
 endif
 PKGS += -pa /usr/lib/yaws/ebin
 PKGS += -pa $(EBINDIR)
-ERLDIR=/usr/lib64/erlang
-ERTS_VSN=5.7.5
-KERNEL_VSN=2.13.5
-STDLIB_VSN=1.16.5
 
 all: application release
 
@@ -69,10 +65,7 @@ clean:
 	@rm -f *.dump
 
 obj/$(NAME).plt:	
-	dialyzer --build_plt -r $(EBINDIR) --output_plt obj/$(NAME).plt \
-	-r $(ERLDIR)/lib/kernel-$(KERNEL_VSN) \
-	-r $(ERLDIR)/lib/stdlib-$(STDLIB_VSN) \
-	-r $(ERLDIR)/lib/erts-$(ERTS_VSN) 
+	dialyzer --build_plt -r $(EBINDIR) --output_plt obj/$(NAME).plt
 
 dialyzer: obj/$(NAME).plt
 	dialyzer --plt obj/$(NAME).plt -r $(EBINDIR)
