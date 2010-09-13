@@ -1,35 +1,18 @@
 -module(test_server).
 -behaviour(gen_server).
 
--include_lib("yaws/include/yaws.hrl").
-
 -export([
-    start_link/1, init/1,
+    start_link/0, init/1,
     handle_call/3, handle_cast/2, handle_info/2,
     terminate/2, code_change/3
 ]).
 
-start_link(Args) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-init([Port]) ->
-
-    {ok, TestChain} = yaws_security:create_filterchain([{test_filter, null}]),
-    ok = yaws_security:create_realm("/", TestChain, test_handler),
-
-    GC = yaws_config:make_default_gconf(false, "test-server"),
-    SC = #sconf{
-      port = Port,
-      servername = "localhost",
-      listen = {0, 0, 0, 0},
-      docroot = "/tmp",
-      appmods = [{"/", yaws_security_filterchain}]
-    },
-    case catch yaws_api:setconf(GC, [[SC]]) of
-        ok -> {ok, started};
-        Error -> {stop, Error}
-    end.
-
+init(_Args) ->
+    {ok, null}.
+ 
 handle_call(Request, _From, State) -> {stop, {unknown_call, Request}, State}.
 
 handle_cast(_Message, State) -> {noreply, State}.
