@@ -10,9 +10,11 @@
 ]).
 
 -export([register_filterchain/3, register_realm/4,
-	 register_provider/2, resolve_handler/2, authenticate/1]).
+	 register_provider/2, register_userdetails/1,
+	 resolve_handler/2, authenticate/1]).
 
--record(state, {filterchains, realms, providers}).
+-record(state, {filterchains, realms, providers,
+		userdetails = fun(Token) -> default_userdetails(Token) end}).
 -record(filterchain, {id, filters}).
 
 -record(realm, {path, chain, handler, options}).
@@ -46,6 +48,9 @@ register_realm(Path, ChainId, Handler, Options) ->
 
 register_provider(Types, Provider) ->
     gen_server:call(?MODULE, {register_provider, Types, Provider}).
+
+register_userdetails(UserDetails) ->
+    gen_server:call(?MODULE, {register_userdetails, UserDetails}).
 
 resolve_handler(Path, Options) ->
     gen_server:call(?MODULE, {resolve_handler, Path, Options}).
@@ -116,13 +121,19 @@ handle_call({register_provider, Types, Provider}, _From, State) ->
     end;
 
 % @private
+handle_call({register_userdetails, UserDetails}, _From, State) ->
+    {reply, ok, State#state{userdetails = UserDetails}};
+
+% @private
 handle_call({authenticate, Token}, _From, State) ->
     Type = Token#token.type,
     case dict:find(Type, State#state.providers) of
 	{ok, Provider} ->
 	    case Provider(Token) of
-		{ok, NewToken} ->
-		    {reply, {ok, NewToken}, State};
+		{ok, NewToken0} ->
+		    UserDetails = State#state.userdetails,
+		    {ok, NewToken1} = UserDetails(NewToken0),
+		    {reply, {ok, NewToken1}, State};
 		{error, Reason} ->
 		    {reply, {error, Reason}, State}
 	    end;
@@ -222,6 +233,13 @@ eval_match(Path, Realm) ->
 	Val ->
 	    nomatch
     end.
+
+% @private
+% by default, all authenticated users are granted 'role_user' authority
+default_userdetails(Token) ->
+    OrigGA = Token#token.granted_authorities,
+    NewGA = sets:union(OrigGA, sets:from_list([role_user])),
+    {ok, Token#token{granted_authorities = NewGA}}.
 
 %---------------------------------------------------------------------------
 % test-harness

@@ -114,13 +114,10 @@ openid_filter(null, _Cmd, _Request, Arg, Ctx, Options) -> % catchall
 
 openid_authenticate(Token) ->
     OpenIdToken = Token#token.extra,
-    case eopenid_v1:verify_signed_keys(OpenIdToken#openid_token.rawurl, OpenIdToken#openid_token.dict) of
+    case eopenid_v1:verify_signed_keys(OpenIdToken#openid_token.rawurl,
+				       OpenIdToken#openid_token.dict) of
 	true ->
-	    {ok,
-	     Token#token {
-	       authenticated=true,
-	       granted_authorities=sets:from_list([role_user])
-	      }};
+	    {ok, Token#token{authenticated=true}};
 	Error ->
 	    {error, Error}
     end.

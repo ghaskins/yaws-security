@@ -84,17 +84,22 @@ process_header([]) ->
     not_found.
 
 saprovider(Token) ->
-    GrantedAuthorities = [role_user],
     ?debugFmt("SIMPLEAUTH: Authenticating: ~p~n", [Token]),
-    {ok, Token#token{
-	   authenticated=true,
-	   granted_authorities=sets:from_list(GrantedAuthorities)
-	  }
-    }.
+    {ok, Token#token{authenticated=true}}.
 
 testhandler(Arg, Ctx) ->
     ?debugFmt("testhandler: ~p~n", [Ctx]),
     [{status, 200}].
+
+role_map("admin", Roles) ->
+    sets:add_element(role_admin, Roles);
+role_map(Principal, Roles) ->
+    Roles.
+
+userdetails(Token) ->
+    ?debugFmt("Userdetails~p~n", [Token]),
+    Roles = role_map(Token#token.principal, sets:from_list([role_user])),
+    {ok, Token#token{granted_authorities = Roles}}.
 
 rest_test() ->
 
@@ -119,20 +124,20 @@ rest_test() ->
 	   []),
     ok = yaws_security:register_realm("/", resttest_chain,
 				      {function, Handler},
-				      [{caller_in_role, [role_user]}]),
+				      [{caller_in_role, [role_admin]}]),
     ok = yaws_security:register_provider([simple], Provider),
 
     ok = yaws_security_basicauth:register_provider(
-	   [role_user],
 	   [#basicauth_record{principal="admin",
-			      password="admin",
-			      granted_authorities=[role_admin]
+			      password="admin"
 			     },
 	    #basicauth_record{principal="user",
 			      password="user"
 			     }
 	   ]
 	  ),
+
+    ok = yaws_security:register_userdetails(fun(Token) -> userdetails(Token) end),
 
     % start an embedded yaws server
     GC = yaws_config:make_default_gconf(false, "test-server"),
@@ -159,6 +164,9 @@ rest_test() ->
     
     {ok, {{_, 401, _}, _, _}} =
 	http:request(get, {"http://admin:badpass@localhost:8000", []}, [], []),
+
+    {ok, {{_, 401, _}, _, _}} =
+	http:request(get, {"http://user:user@localhost:8000", []}, [], []),
 
     {ok, {{_, 200, _}, _, _}} =
 	http:request(get, {"http://admin:admin@localhost:8000", []}, [], []),

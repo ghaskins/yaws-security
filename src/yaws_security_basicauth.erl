@@ -7,11 +7,11 @@
 
 -include_lib("yaws_security.hrl").
 
--export([init/0, register_provider/2]).
+-export([init/0, register_provider/1]).
 
 -record(basicauth_token, {password}).
 
--record(state, {default_authorities, records}).
+-record(state, {records}).
 
 init() ->
     ok = yaws_security:register_filterchain(
@@ -43,34 +43,20 @@ basicauth_filter(Arg, Ctx) ->
 
 basicauth_authenticate(Token, State)
   when is_record(State, state) ->
-    ?debugFmt("BASICAUTH: Authenticating: ~p~n", [Token]),
+    BaToken = Token#token.extra,
+    Password = BaToken#basicauth_token.password,
+
     case dict:find(Token#token.principal, State#state.records) of
-	{ok, Record} ->
-	    BaToken = Token#token.extra,
-	    UserPassword = BaToken#basicauth_token.password,
-	    StoredPassword = Record#basicauth_record.password,
-	    if
-		UserPassword =:= StoredPassword ->
-		    GrantedAuthorities
-			= lists:flatten(
-			    State#state.default_authorities,
-			    Record#basicauth_record.granted_authorities),
-		    {ok,
-		     Token#token {
-		       authenticated=true,
-		       granted_authorities=sets:from_list(GrantedAuthorities)
-		      }
-		    };
-		true ->
-		    {error, bad_password}
-	    end;
+	{ok, Record=#basicauth_record{password = Password}} ->
+	    {ok, Token#token{authenticated=true}};
+	{ok, _} ->
+	    {error, bad_password};
 	_ ->
 	    {error, user_notfound}
     end.
 
-register_provider(DefaultAuthorities, Records) ->
+register_provider(Records) ->
     State = #state{
-      default_authorities = DefaultAuthorities,
       records = process_records(Records, dict:new())
      },
 
