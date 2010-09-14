@@ -15,7 +15,7 @@
 -record(state, {filterchains, realms, providers}).
 -record(filterchain, {id, filters}).
 
--record(realm, {path, chain, handler}).
+-record(realm, {path, chain, handler, options}).
 
 % @private
 start_link() ->
@@ -67,7 +67,7 @@ handle_call({register_filterchain, Id, ChainSpec, []}, _From, State) ->
     end;
 
 % @private
-handle_call({register_realm, Path, ChainId, {function, Handler}, []},
+handle_call({register_realm, Path, ChainId, {function, Handler}, Options},
 	    _From, State) ->
     case dict:find(Path, State#state.realms) of
 	{ok, _} ->
@@ -75,10 +75,21 @@ handle_call({register_realm, Path, ChainId, {function, Handler}, []},
 	error ->
 	    case dict:find(ChainId, State#state.filterchains) of
 		{ok, _} ->
-		    Realm = #realm{path = Path, chain = ChainId, handler = Handler},
-		    Realms = dict:store(Path, Realm, State#state.realms),
+		    try validate_options(Options) of
+			ok ->
+			    Realm = #realm{path = Path,
+					   chain = ChainId,
+					   handler = Handler,
+					   options = Options},
+			    Realms = dict:store(Path, Realm, State#state.realms),
 
-		    {reply, ok, State#state{realms = Realms}};
+			    {reply, ok, State#state{realms = Realms}}
+		    catch
+			throw:{invalid_option, InvalidOption} ->
+			    {reply,
+			     {error, {invalid_option, InvalidOption}},
+			      State}
+		    end;
 		_ ->
 		    {reply, {error, bad_chain_id}, State}
 	    end
@@ -144,6 +155,12 @@ check_existing_providers([Type | T], Providers) ->
 	    check_existing_providers(T, Providers)
     end;
 check_existing_providers([], _Providers) ->
+    ok.
+
+% @private
+validate_options([Option | T]) ->
+    throw({invalid_option, Option});
+validate_options([]) ->
     ok.
 
 register_filterchain({Id, ChainSpec, State}) ->
@@ -248,7 +265,6 @@ filter_test() ->
 				      {function, Handler2},
 				      []
 				     ),
-
     {error, exists}
 	= yaws_security:register_realm(
 	    "/good/path",
@@ -256,20 +272,7 @@ filter_test() ->
 	    {function, Handler2},
 	    []
 	   ),
-    {error, bad_chain_id}
-	= yaws_security:register_realm(
-	    "/bogus",
-	    badid,
-	    {function, Handler1},
-	    []
-	   ),
-    {error, bad_handler}
-	= yaws_security:register_realm(
-	    "/bogus",
-	    mychain,
-	    bad_handler,
-	    []),
-    
+
     {ok, Chain1, Handler1} = resolve_handler("/good/path/and/then/some", []),
     {ok, Chain1, Handler2} = resolve_handler("/good/path/even/better/foo", []),
     {error, notfound} = resolve_handler("/bad/path", []).
@@ -300,5 +303,33 @@ providers_test() ->
     ok = register_provider([foo], Provider),
     {error, conflict} = register_provider([foo, bar], Provider).
 
-					     
+
+badchainid_test() ->
+    {error, bad_chain_id}
+	= yaws_security:register_realm(
+	    "/bogus",
+	    badid,
+	    {function, fun(Arg, Ctx) -> first_handler(Arg, Ctx) end},
+	    []
+	   ).
+
+badhandler_test() ->
+    {error, bad_handler}
+	= yaws_security:register_realm(
+	    "/bogus",
+	    mychain,
+	    bad_handler,
+	    []).
+
+badoptions_test() ->
+    {error, {invalid_option, {bad_option}}}
+	= yaws_security:register_realm(
+	    "/good",
+	    mychain,
+	    {function, fun(Arg, Ctx) -> first_handler(Arg, Ctx) end},
+	    [{bad_option}]).
+
+
+    
+
     
