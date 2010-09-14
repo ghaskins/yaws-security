@@ -10,7 +10,7 @@
     terminate/2, code_change/3
 ]).
 
--export([stop/1, token_set/2, token_get/1, caller_in_role/2]).
+-export([stop/1, token_set/2, token_get/1, caller_in_role/2, principal/1]).
 
 -record(state, {token}).
 
@@ -40,6 +40,10 @@ caller_in_role(Ctx, Role) when is_record(Ctx, context); is_atom(Role) ->
 	ok -> ok;
 	_ -> throw(unauthorized)
     end.
+
+principal(Ctx) ->
+    {ok, Token} = token_get(Ctx),
+    Token#token.principal.
 
 % @private
 caller_in_role(Role, Token, State) when Token =:= null ->

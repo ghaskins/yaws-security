@@ -31,6 +31,6 @@ start(_Type, _StartArgs) ->
 
 testhandler(Arg, Ctx) ->
     yaws_security_context:caller_in_role(Ctx, role_user),
-    [{status, 200}, {html, "Hello, World"}].
+    [{status, 200}, {html, "Hello, " ++ yaws_security_context:principal(Ctx)}].
 
 stop(_State) -> ok.
