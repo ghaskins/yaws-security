@@ -63,8 +63,7 @@ get_session(Arg) ->
 openid_filter(Arg, Ctx) ->
     case yaws_security_context:token_get(Ctx) of
 	{ok, _} ->
-	    yaws_security_filterchain:next(Arg, Ctx),
-	    ok;
+	    yaws_security_filterchain:next(Arg, Ctx);
 	null ->
 	    Req = Arg#arg.req,
 	    Url = yaws_api:request_url(Arg),
