@@ -14,16 +14,17 @@ out(Arg) ->
     Req = Arg#arg.req,
     {abs_path, Path} = Req#http_request.path,
     case yaws_security:resolve_handler(Path, []) of
-	{ok, Chain, Handler} ->
-	    process(Arg, Chain, Handler);
+	{ok, Chain, Handler, Options} ->
+	    process(Arg, Chain, Handler, Options);
 	{error, Error} ->
 	    [{status, 404}]
     end.
 
-process(Arg, Chain, Handler) ->
+process(Arg, Chain, Handler, Options) ->
     {ok, Pid} = yaws_security_context:start_link(),
 
-    Ctx = #context{pid = Pid, chain = Chain, handler = Handler},
+    Ctx = #context{pid = Pid, chain = Chain,
+		   handler = Handler, options = Options},
     
     try next(Arg, Ctx)
     catch
@@ -33,9 +34,24 @@ process(Arg, Chain, Handler) ->
 	yaws_security_context:stop(Pid)
     end.
 
+process_roles(Arg, Ctx, [Role | T]) ->
+    yaws_security_context:caller_in_role(Ctx, Role),
+    process_roles(Arg, Ctx, T);
+process_roles(Arg, Ctx, []) ->
+    ok.
+
+process_options(Arg, Ctx, [{caller_in_role, Roles} | T]) ->
+    process_roles(Arg, Ctx, Roles);
+process_options(Arg, Ctx, []) ->
+    ok.
+
 next(Arg, Ctx=#context{chain=[FilterFun | T]}) ->
     FilterFun(Arg, Ctx#context{chain=T});
-next(Arg, Ctx=#context{chain=[], handler=HandlerFun}) ->
+next(Arg, Ctx=#context{chain=[]}) ->
+    HandlerFun = Ctx#context.handler,
+    
+    process_options(Arg, Ctx, Ctx#context.options),
+
     HandlerFun(Arg, Ctx).
 
 %----------------------------------------------------------------------
@@ -77,7 +93,6 @@ saprovider(Token) ->
     }.
 
 testhandler(Arg, Ctx) ->
-    yaws_security_context:caller_in_role(Ctx, role_user),
     ?debugFmt("testhandler: ~p~n", [Ctx]),
     [{status, 200}].
 
@@ -101,7 +116,8 @@ rest_test() ->
 	    {function, fun(Arg, Ctx) -> safilter(Arg, Ctx) end}],
 	   []),
     ok = yaws_security:register_realm("/", resttest_chain,
-				      {function, Handler}, []),
+				      {function, Handler},
+				      [{caller_in_role, [role_user]}]),
     ok = yaws_security:register_provider([simple], Provider),
 
     ok = yaws_security_basicauth:register_provider(

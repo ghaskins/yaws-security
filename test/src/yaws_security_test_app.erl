@@ -11,7 +11,7 @@ start(_Type, _StartArgs) ->
     ok = yaws_security:register_realm("/", openid,
 				      {function,
 				       fun(Arg, Ctx) -> testhandler(Arg, Ctx) end},
-				      []),
+				      [{caller_in_role, [role_user]}]),
 
     GC = yaws_config:make_default_gconf(false, "test-server"),
     SC = #sconf{
@@ -30,7 +30,6 @@ start(_Type, _StartArgs) ->
     test_server:start_link().
 
 testhandler(Arg, Ctx) ->
-    yaws_security_context:caller_in_role(Ctx, role_user),
     [{status, 200}, {html, "Hello, " ++ yaws_security_context:principal(Ctx)}].
 
 stop(_State) -> ok.

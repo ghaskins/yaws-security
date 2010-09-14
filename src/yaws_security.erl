@@ -158,6 +158,8 @@ check_existing_providers([], _Providers) ->
     ok.
 
 % @private
+validate_options([{caller_in_role, Roles} | T]) when is_list(Roles) ->
+    ok;
 validate_options([Option | T]) ->
     throw({invalid_option, Option});
 validate_options([]) ->
@@ -210,7 +212,7 @@ find_best_chain([], {match, _, Realm}, State) ->
     ChainId = Realm#realm.chain,
     {ok, FilterChain} = dict:find(ChainId, State#state.filterchains),
     Functions = [X || X <- FilterChain#filterchain.filters],
-    {reply, {ok, Functions, Realm#realm.handler}, State}.
+    {reply, {ok, Functions, Realm#realm.handler, Realm#realm.options}, State}.
 
 % @private
 eval_match(Path, Realm) ->
@@ -273,8 +275,8 @@ filter_test() ->
 	    []
 	   ),
 
-    {ok, Chain1, Handler1} = resolve_handler("/good/path/and/then/some", []),
-    {ok, Chain1, Handler2} = resolve_handler("/good/path/even/better/foo", []),
+    {ok, Chain1, Handler1, _} = resolve_handler("/good/path/and/then/some", []),
+    {ok, Chain1, Handler2, _} = resolve_handler("/good/path/even/better/foo", []),
     {error, notfound} = resolve_handler("/bad/path", []).
 
 bad_filterspec_test() ->
