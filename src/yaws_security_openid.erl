@@ -29,10 +29,11 @@ login(Arg) ->
 %% This function renders the default login page
 login_form(Arg) ->
     {ehtml,
-     [{h2, [], "Login"},
+     [{h2, [], "OpenID Login:"},
       {form, [{method, get},
 	      {action, "/openid/login"}],
        [
+		 {img, [{src, "http://openid.net/images/login-bg.gif"}]},
 	{input, [{name, openid.claimed_id},
 		 {type, text},
 		 {size, "48"}]},
