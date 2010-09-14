@@ -69,7 +69,7 @@ openid_filter({ok, _}, _, _, Arg, Ctx, _) ->
 
 openid_filter(null, 'GET', ["openid", "submit"], Arg, Ctx, _) ->
     {ok, ClaimedId} = yaws_api:queryvar(Arg, "openid.claimed_id"),
-    {ok, Cookie, Session} = util:get_session("openid.login", Arg),
+    {ok, Cookie, Session} = yaws_security:get_session("openid.login", Arg),
 
     Url = yaws_api:request_url(Arg),
     RawRoot = yaws_api:format_url(#url{scheme = Url#url.scheme,
@@ -89,7 +89,7 @@ openid_filter(null, 'GET', ["openid", "submit"], Arg, Ctx, _) ->
 
 openid_filter(null, Cmd, ["openid", "auth"], Arg, Ctx, _) ->
     {ok, Principal} = yaws_api:queryvar(Arg, "openid.identity"),
-    {ok, Cookie, Session} = util:get_session("openid.login", Arg),
+    {ok, Cookie, Session} = yaws_security_util:get_session("openid.login", Arg),
 
     RawUrl = unicode:characters_to_list(
 	       yaws_api:format_url(yaws_api:request_url(Arg))),

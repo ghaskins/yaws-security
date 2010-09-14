@@ -20,7 +20,7 @@ init() ->
 
 filter(Arg, Ctx) ->
     Token = yaws_security_context:token_get(Ctx),
-    Cookie = util:get_session("ysid", Arg),
+    Cookie = yaws_security_util:get_session("ysid", Arg),
     filter(Token, Cookie, Arg, Ctx).
 
 filter({ok, _}, _, Arg, Ctx) ->

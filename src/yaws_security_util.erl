@@ -1,4 +1,4 @@
--module(util).
+-module(yaws_security_util).
 
 -include_lib("yaws/include/yaws.hrl").
 -include_lib("yaws/include/yaws_api.hrl").
