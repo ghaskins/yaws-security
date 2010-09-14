@@ -7,31 +7,39 @@
 
 -include_lib("yaws_security.hrl").
 
--export([init/0, register_provider/0]).
+-export([init/0, create_filter/2, register_provider/0]).
 
 -record(openid_token, {dict = eopenid_lib:new(), rawurl}).
 -record(session, {orig_arg, dict = eopenid_lib:new()}).
 
 -record(state, {default_authorities, records}).
 
+-record(filteroptions, {login_redirect = "/openid/login"}).
+
 init() ->
+    create_filter(openid, []).
+
+parse_options([{login_redirect, Redirect} | T], Options) ->
+    parse_options(T, Options#filteroptions{login_redirect = Redirect});
+parse_options([Option | T], Options) ->
+    throw({invalid_option, Option});
+parse_options([], Options) ->
+    Options.
+
+create_filter(Name, RawOptions) ->
+    Options = parse_options(RawOptions, #filteroptions{}),
     ok = yaws_security:register_filterchain(
-	   openid,
-	   [{function, fun(Arg, Ctx) -> openid_filter(Arg, Ctx) end}],
+	   Name,
+	   [{function, fun(Arg, Ctx) -> openid_filter(Arg, Ctx, Options) end}],
 	   []
 	  ).
-
-login(Arg) ->
-    Session = #session{orig_arg = Arg},
-    Cookie = yaws_api:new_cookie_session(Session),
-    [login_form(Arg), yaws_api:setcookie("openid.login", Cookie)].
 
 %% This function renders the default login page
 login_form(Arg) ->
     {ehtml,
      [{h2, [], "OpenID Login:"},
       {form, [{method, get},
-	      {action, "/openid/login"}],
+	      {action, "/openid/submit"}],
        [
 		 {img, [{src, "http://openid.net/images/login-bg.gif"}]},
 	{input, [{name, openid.claimed_id},
@@ -45,18 +53,21 @@ login_form(Arg) ->
      ]
     }.
 
-openid_filter(Arg, Ctx) ->
-    case yaws_security_context:token_get(Ctx) of
-	{ok, _} ->
-	    yaws_security_filterchain:next(Arg, Ctx);
-	null ->
-	    Req = Arg#arg.req,
-	    Url = yaws_api:request_url(Arg),
-	    openid_filter(Req#http_request.method,
-			  string:tokens(Url#url.path, "/"), Arg, Ctx)
-    end.
+openid_filter(Arg, Ctx, Options) ->
+    Req = Arg#arg.req,
+    Url = yaws_api:request_url(Arg),
+    Token = yaws_security_context:token_get(Ctx),
 
-openid_filter(Cmd, ["openid", "login"], Arg, Ctx) ->
+    openid_filter(Token, Req#http_request.method,
+		  string:tokens(Url#url.path, "/"), Arg, Ctx, Options).
+
+openid_filter(_, 'GET', ["openid", "login"], Arg, Ctx, _) ->
+    [login_form(Arg)];
+
+openid_filter({ok, _}, _, _, Arg, Ctx, _) ->
+    yaws_security_filterchain:next(Arg, Ctx);    
+
+openid_filter(null, 'GET', ["openid", "submit"], Arg, Ctx, _) ->
     {ok, ClaimedId} = yaws_api:queryvar(Arg, "openid.claimed_id"),
     {ok, Cookie, Session} = util:get_session("openid.login", Arg),
 
@@ -76,7 +87,7 @@ openid_filter(Cmd, ["openid", "login"], Arg, Ctx) ->
     {ok, Redirect} = eopenid_v1:checkid_setup(Dict2),
     [yaws_api:redirect(Redirect)];
 
-openid_filter(Cmd, ["openid", "auth"], Arg, Ctx) ->
+openid_filter(null, Cmd, ["openid", "auth"], Arg, Ctx, _) ->
     {ok, Principal} = yaws_api:queryvar(Arg, "openid.identity"),
     {ok, Cookie, Session} = util:get_session("openid.login", Arg),
 
@@ -91,11 +102,14 @@ openid_filter(Cmd, ["openid", "auth"], Arg, Ctx) ->
 
     yaws_security_filterchain:next(Session#session.orig_arg, Ctx);
 
-openid_filter(Cmd, Request, Arg, Ctx) -> % catchall
+openid_filter(null, _Cmd, _Request, Arg, Ctx, Options) -> % catchall
     try yaws_security_filterchain:next(Arg, Ctx)
     catch
 	throw:unauthorized ->
-	    login(Arg)
+	    Session = #session{orig_arg = Arg},
+	    Cookie = yaws_api:new_cookie_session(Session),
+	    [yaws_api:redirect(Options#filteroptions.login_redirect),
+	     yaws_api:setcookie("openid.login", Cookie)]
     end.
 
 openid_authenticate(Token) ->
@@ -117,3 +131,12 @@ register_provider() ->
       fun(Token) -> openid_authenticate(Token) end
      ).
 
+invalidoption_test() ->
+
+    try create_filter(bad_filter, [foo]) of
+	_ ->
+	    throw(unexpected_success)
+    catch
+	throw:{invalid_option, foo} ->
+	    ok
+    end.
