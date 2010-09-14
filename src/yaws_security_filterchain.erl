@@ -98,14 +98,16 @@ testhandler(Arg, Ctx) ->
 
 rest_test() ->
 
-    yaws_security_basicauth:init(),
+    application:start(yaws),
+    application:start(yaws_security),
 
     Handler = fun(Arg, Ctx) -> testhandler(Arg, Ctx) end,
     Provider = fun(Token) -> saprovider(Token) end,
     
     ok = yaws_security:register_filterchain(
 	   resttest_base_chain,
-	   [ {chain, basic_auth},
+	   [ {chain, http_session}, 
+	     {chain, basic_auth},
 	     {function, fun(Arg, Ctx) -> testfilter(Arg, Ctx, a) end}
 	   ],
 	   []),
@@ -131,8 +133,6 @@ rest_test() ->
 			     }
 	   ]
 	  ),
-
-    application:start(yaws),
 
     % start an embedded yaws server
     GC = yaws_config:make_default_gconf(false, "test-server"),

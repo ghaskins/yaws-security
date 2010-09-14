@@ -5,10 +5,15 @@
 -include_lib("yaws/include/yaws.hrl").
 
 start(_Type, _StartArgs) ->
-    yaws_security_openid:init(),
     yaws_security_openid:register_provider(),
 
-    ok = yaws_security:register_realm("/", openid,
+    ok = yaws_security:register_filterchain(
+	   my_chain,
+	   [ {chain, http_session}, 
+	     {chain, openid}
+	   ],
+	   []),
+    ok = yaws_security:register_realm("/", my_chain,
 				      {function,
 				       fun(Arg, Ctx) -> testhandler(Arg, Ctx) end},
 				      [{caller_in_role, [role_user]}]),

@@ -44,22 +44,6 @@ login_form(Arg) ->
      ]
     }.
 
-get_session(Arg) ->
-    H = Arg#arg.headers,
-    case yaws_api:find_cookie_val("openid.login", H#headers.cookie) of
-        Cookie when Cookie /= [] ->
-            case yaws_api:cookieval_to_opaque(Cookie) of
-                {ok, Session} ->
-                    {ok, Cookie, Session};
-                {error, {has_session, Session}} ->
-                    {ok, Cookie, Session};
-                Else ->
-                    Else
-            end;
-        [] ->
-            {error, nocookie}
-    end.
-
 openid_filter(Arg, Ctx) ->
     case yaws_security_context:token_get(Ctx) of
 	{ok, _} ->
@@ -73,7 +57,7 @@ openid_filter(Arg, Ctx) ->
 
 openid_filter(Cmd, ["openid", "login"], Arg, Ctx) ->
     {ok, ClaimedId} = yaws_api:queryvar(Arg, "openid.claimed_id"),
-    {ok, Cookie, Session} = get_session(Arg),
+    {ok, Cookie, Session} = util:get_session("openid.login", Arg),
 
     Url = yaws_api:request_url(Arg),
     RawRoot = yaws_api:format_url(#url{scheme = Url#url.scheme,
@@ -93,7 +77,7 @@ openid_filter(Cmd, ["openid", "login"], Arg, Ctx) ->
 
 openid_filter(Cmd, ["openid", "auth"], Arg, Ctx) ->
     {ok, Principal} = yaws_api:queryvar(Arg, "openid.identity"),
-    {ok, Cookie, Session} = get_session(Arg),
+    {ok, Cookie, Session} = util:get_session("openid.login", Arg),
 
     RawUrl = unicode:characters_to_list(
 	       yaws_api:format_url(yaws_api:request_url(Arg))),
