@@ -7,7 +7,7 @@
 
 -include_lib("yaws_security.hrl").
 
--export([init/0, register_provider/1]).
+-export([init/0, register_provider/1, get_password/1]).
 
 -record(basicauth_token, {password}).
 
@@ -64,6 +64,10 @@ register_provider(Records) ->
       [basic],
       fun(Token) -> basicauth_authenticate(Token, State) end
      ).
+
+get_password(Token) ->
+    BaToken = Token#token.extra,
+    {ok, BaToken#basicauth_token.password}.
 
 process_records([Record | T], Dict) when is_record(Record, basicauth_record) ->
     NewDict = dict:store(Record#basicauth_record.principal, Record, Dict),
