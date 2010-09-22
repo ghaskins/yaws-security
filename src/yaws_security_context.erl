@@ -10,13 +10,13 @@
     terminate/2, code_change/3
 ]).
 
--export([stop/1, token_set/2, token_get/1, caller_in_role/2, principal/1]).
+-export([stop/1, token_set/2, token_get/1, clear/1, caller_in_role/2, principal/1]).
 
 -record(state, {token}).
 
 % @private
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server:start_link(?MODULE, [], []).
 
 % @private
 init(_Args) ->
@@ -34,6 +34,9 @@ token_get(Ctx) when is_record(Ctx, context) ->
     token_get(Ctx#context.pid);
 token_get(Pid) ->
     gen_server:call(Pid, get).
+
+clear(Ctx) ->
+    gen_server:call(Ctx#context.pid, clear).
 
 caller_in_role(Ctx, Role) when is_record(Ctx, context); is_atom(Role) ->
     case gen_server:call(Ctx#context.pid, {caller_in_role, Role}) of
@@ -62,6 +65,10 @@ caller_in_role(Role, Token=#token{authenticated=true}, State) ->
 	false ->
 	    {reply, no, State}
     end.
+
+% @private
+handle_call(clear, _From, State) ->
+    {reply, ok, State#state{token = null}};
 
 % @private
 handle_call({caller_in_role, Role}, _From, State) ->

@@ -21,7 +21,10 @@ out(Arg) ->
     end.
 
 process(Arg, Chain, Handler, Options) ->
-    {ok, Pid} = yaws_security_context:start_link(),
+    Pid = case yaws_security_context:start_link() of
+	      {ok, Pid1} ->  Pid1;
+	      Else -> throw({context_failure, Else})
+	  end,
 
     Ctx = #context{pid = Pid, chain = Chain,
 		   handler = Handler, options = Options},
