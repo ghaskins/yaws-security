@@ -32,7 +32,9 @@ process(Arg, Chain, Handler, Options) ->
     try next(Arg, Ctx)
     catch
 	throw:unauthorized ->
-	    [{status, 401}]
+	    [{status, 401}];
+	throw:forbidden ->
+	    [{status, 403}]
     after
 	yaws_security_context:stop(Pid)
     end.
@@ -168,7 +170,7 @@ rest_test() ->
     {ok, {{_, 401, _}, _, _}} =
 	http:request(get, {"http://admin:badpass@localhost:8000", []}, [], []),
 
-    {ok, {{_, 401, _}, _, _}} =
+    {ok, {{_, 403, _}, _, _}} =
 	http:request(get, {"http://user:user@localhost:8000", []}, [], []),
 
     {ok, {{_, 200, _}, _, _}} =

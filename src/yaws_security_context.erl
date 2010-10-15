@@ -40,8 +40,9 @@ clear(Ctx) ->
 
 caller_in_role(Ctx, Role) when is_record(Ctx, context); is_atom(Role) ->
     case gen_server:call(Ctx#context.pid, {caller_in_role, Role}) of
-	ok -> ok;
-	_ -> throw(unauthorized)
+	yes -> ok;
+	no  -> throw(forbidden);
+	_   -> throw(unauthorized)
     end.
 
 principal(Ctx) ->
@@ -53,7 +54,7 @@ caller_in_role(Role, Token, State) when Token =:= null ->
     {reply, {error, notoken}, State};
 caller_in_role(Role, Token=#token{authenticated=false}, State) ->
     case yaws_security:authenticate(Token) of
-	{ok, NewToken} ->
+	{ok, NewToken=#token{authenticated=true}} ->
 	    caller_in_role(Role, NewToken, State#state{token = NewToken});
 	{error, Reason} ->
 	    {reply, {error, Reason}, State}
@@ -61,7 +62,7 @@ caller_in_role(Role, Token=#token{authenticated=false}, State) ->
 caller_in_role(Role, Token=#token{authenticated=true}, State) ->
     case sets:is_element(Role, Token#token.granted_authorities) of
 	true ->
-	    {reply, ok, State};
+	    {reply, yes, State};
 	false ->
 	    {reply, no, State}
     end.
