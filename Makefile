@@ -39,7 +39,7 @@ $(BASEDIR)/include/%.hrl: include/%.hrl $(BASEDIR)/include
 $(EBINDIR)/$(NAME).app: $(NAME).app Makefile $(HEADERS)
 	@echo "Compiling (APPSPEC) $< to $@"
 	cat $< | sed "s/__MODULES__/$(MODULES)/" | sed 's/\[, /\[/' \
-	| sed "s/__VERSION__/$(VERSION).$(RELEASE)/g" > $@ 
+	| sed "s/__VERSION__/$(VERSION)/g" > $@ 
 
 $(OBJS): $(SRCS) Makefile
 
