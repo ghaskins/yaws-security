@@ -25,7 +25,7 @@ Authors
 make
 
 %install
-make install INSTPATH=$RPM_BUILD_ROOT%{_libdir}/erlang/lib
+make install INSTPATH=$RPM_BUILD_ROOT%{_libdir}/erlang/lib/%{name}-%{version}
 
 # Install documentation  
 %clean
@@ -33,6 +33,6 @@ make clean
 
 %files
 %defattr(-,root,root)
-%{_libdir}/erlang/lib/%{name}-%{version}.%{release}
+%{_libdir}/erlang/lib/%{name}-%{version}
 
 %changelog
