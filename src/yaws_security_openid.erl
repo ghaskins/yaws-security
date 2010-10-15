@@ -10,7 +10,7 @@
 -export([init/0, create_filter/2, register_provider/0]).
 
 -record(openid_token, {dict = eopenid_lib:new(), rawurl}).
--record(session, {orig_arg, dict = eopenid_lib:new()}).
+-record(session, {orig_url, dict = eopenid_lib:new()}).
 
 -record(state, {default_authorities, records}).
 
@@ -69,8 +69,19 @@ openid_filter({ok, _}, _, _, Arg, Ctx, _) ->
 
 openid_filter(null, 'GET', ["openid", "submit"], Arg, Ctx, _) ->
     {ok, ClaimedId} = yaws_api:queryvar(Arg, "openid.claimed_id"),
-    {ok, Cookie, Session} = yaws_security_util:get_session("openid.login", Arg),
-
+    {Mode, Cookie, Session} = 
+	case yaws_security_util:get_session("openid.login", Arg) of 
+	    {ok, C, S} -> {found, C, S};
+	    _ ->
+		% we can get here if the user visited the login URL
+		% without being directed there by an access
+		% exception.  We do not know what URL they may
+		% actually want, so just assume "/" 
+		S = #session{orig_url = "/"},
+		C = yaws_api:new_cookie_session(S),
+		{created, C, S}
+	end,
+	
     Url = yaws_api:request_url(Arg),
     RawRoot = yaws_api:format_url(#url{scheme = Url#url.scheme,
 				       host = Url#url.host,
@@ -85,7 +96,12 @@ openid_filter(null, 'GET', ["openid", "submit"], Arg, Ctx, _) ->
     yaws_api:replace_cookie_session(Cookie, Session#session{dict = Dict2}),
 
     {ok, Redirect} = eopenid_v1:checkid_setup(Dict2),
-    [yaws_api:redirect(Redirect)];
+
+    case Mode of
+	found -> [yaws_api:redirect(Redirect)]; 
+	created -> [yaws_api:redirect(Redirect),
+		    yaws_api:setcookie("openid.login", Cookie)]
+    end;
 
 openid_filter(null, Cmd, ["openid", "auth"], Arg, Ctx, _) ->
     {ok, Principal} = yaws_api:queryvar(Arg, "openid.identity"),
@@ -100,17 +116,21 @@ openid_filter(null, Cmd, ["openid", "auth"], Arg, Ctx, _) ->
     ok = yaws_security_context:token_set(Ctx, Token),
     yaws_api:delete_cookie_session(Cookie),
 
-    yaws_security_filterchain:next(Session#session.orig_arg, Ctx);
+    yaws_api:redirect(Session#session.orig_url);
 
-openid_filter(null, _Cmd, _Request, Arg, Ctx, Options) -> % catchall
+openid_filter(null, 'GET', _Request, Arg, Ctx, Options) ->
     try yaws_security_filterchain:next(Arg, Ctx)
     catch
 	throw:unauthorized ->
-	    Session = #session{orig_arg = Arg},
+	    Url = yaws_api:request_url(Arg),
+	    Session = #session{orig_url = Url#url.path},
 	    Cookie = yaws_api:new_cookie_session(Session),
 	    [yaws_api:redirect(Options#filteroptions.login_redirect),
 	     yaws_api:setcookie("openid.login", Cookie)]
-    end.
+    end;
+
+openid_filter(null, _Cmd, _Request, Arg, Ctx, Options) -> % catchall
+    yaws_security_filterchain:next(Arg, Ctx).
 
 openid_authenticate(Token) ->
     OpenIdToken = Token#token.extra,
