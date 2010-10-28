@@ -91,8 +91,19 @@ openid_filter(null, 'GET', ["openid", "submit"], Arg, Ctx, _) ->
 	      [eopenid_lib:in("openid.return_to", Root ++ "/openid/auth"),
 	       eopenid_lib:in("openid.trust_root", Root)
 	      ], eopenid_lib:new()),
-    {ok,Dict1} = eopenid_v1:discover(ClaimedId, Dict0),
-    {ok,Dict2} = eopenid_v1:associate(Dict1),
+
+    Dict1 = try eopenid_v1:discover(ClaimedId, Dict0) of
+		{ok,D1} -> D1;
+		{error, Error} -> throw({login_failed, Error})
+	    catch
+		_:Error1 -> throw({login_failed, Error1})
+	    end,
+    Dict2 = try eopenid_v1:associate(Dict1) of
+		{ok,D2} -> D2;
+		error -> throw({login_failed, bad_association})
+	    catch
+		_:Error2 -> throw({login_failed, Error2})
+	    end,
     yaws_api:replace_cookie_session(Cookie, Session#session{dict = Dict2}),
 
     {ok, Redirect} = eopenid_v1:checkid_setup(Dict2),

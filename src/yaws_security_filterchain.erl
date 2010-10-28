@@ -33,6 +33,8 @@ process(Arg, Chain, Handler, Options) ->
     catch
 	throw:unauthorized ->
 	    [{status, 401}];
+	throw:{login_failed, Error} ->
+	    [{status, 403}];
 	throw:forbidden ->
 	    [{status, 403}]
     after
