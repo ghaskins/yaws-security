@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.github.ghaskins</groupId>
+  <artifactId>yaws_security</artifactId>
+  <name>YAWS Security Library</name>
+  <version>0.1.1</version>
+  <packaging>erlang-otp</packaging>
+
+  <dependencies>
+     <dependency>
+      <groupId>com.github.klacke</groupId>
+      <artifactId>yaws</artifactId>
+      <version>1.89</version>
+      <type>erlang-otp</type>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+	<groupId>eu.lindenbaum</groupId>
+	<artifactId>maven-erlang-plugin</artifactId>
+	<version>2.0.0-SNAPSHOT</version>
+	<extensions>true</extensions>
+	<configuration>
+	  <systemDependencies>sasl</systemDependencies>
+	  <skipDialyzer>true</skipDialyzer>
+	</configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
