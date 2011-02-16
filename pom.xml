@@ -24,7 +24,9 @@
 	<version>2.0.0-SNAPSHOT</version>
 	<extensions>true</extensions>
 	<configuration>
-	  <systemDependencies>sasl</systemDependencies>
+	  <otpDependencies>
+	    <code>sasl</code>
+	  </otpDependencies>
 	  <skipDialyzer>true</skipDialyzer>
 	</configuration>
       </plugin>
