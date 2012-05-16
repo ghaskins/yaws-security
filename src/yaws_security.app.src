@@ -1,0 +1,6 @@
+{application, yaws_security,
+  [{description, ""},
+   {vsn, "1"},
+   {registered, []},
+   {mod, {'yaws_security_app', []}}
+]}.	       
